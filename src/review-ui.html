@@ -1,0 +1,2653 @@
+    <style id="local-mr-review-ui">
+      html {
+        height: 100%;
+        scroll-behavior: smooth;
+      }
+
+      body {
+        --lm-accent: #4991e0;
+        --lm-accent-soft: #eaf5ff;
+        --lm-bg: #f7f8fa;
+        --lm-border: #e5e6eb;
+        --lm-code-bg: #ffffff;
+        --lm-header-bg: #ffffff;
+        --lm-hover: #f0f3f7;
+        --lm-muted: #7d8089;
+        --lm-panel: #ffffff;
+        --lm-selected: #eaf5ff;
+        --lm-text: #292929;
+        --lm-green: #6dc37d;
+        --lm-green-soft: #d8fed8;
+        --lm-red: #f36479;
+        --lm-red-soft: #ffebed;
+        --d2h-bg-color: #ffffff;
+        --d2h-border-color: #dfe3e8;
+        --d2h-file-header-bg-color: #f8f9fb;
+        --d2h-file-header-border-color: #dfe3e8;
+        --d2h-line-border-color: #edf0f3;
+        --d2h-info-bg-color: rgba(0, 136, 255, 0.07);
+        --d2h-info-border-color: #d8eaf8;
+        --d2h-ins-bg-color: #d8fed8;
+        --d2h-ins-border-color: #beecc1;
+        --d2h-ins-highlight-bg-color: #b8edbf;
+        --d2h-del-bg-color: #ffebed;
+        --d2h-del-border-color: #f6ccd2;
+        --d2h-del-highlight-bg-color: #f7c5cc;
+        box-sizing: border-box;
+        height: 100%;
+        margin: 0 !important;
+        overflow: hidden;
+        background: var(--lm-bg) !important;
+        color: var(--lm-text);
+        font-family: "Segoe UI Variable Text", "Segoe UI", Arial, sans-serif !important;
+        text-align: left !important;
+      }
+
+      html:not(.local-mr-ready) body > h1,
+      html:not(.local-mr-ready) body > .local-mr-version-bar,
+      html:not(.local-mr-ready) #diff {
+        visibility: hidden;
+      }
+
+      html:not(.local-mr-ready) body::after {
+        position: fixed;
+        inset: 0;
+        z-index: 6;
+        display: grid;
+        place-items: center;
+        background: var(--lm-bg);
+        color: var(--lm-muted);
+        content: "Preparing version diff…";
+        font-size: 12px;
+      }
+
+      body.local-mr-dark {
+        --lm-accent: #6ea8fe;
+        --lm-accent-soft: #17345f;
+        --lm-bg: #0f141b;
+        --lm-border: #2b3440;
+        --lm-code-bg: #111820;
+        --lm-header-bg: #151c25;
+        --lm-hover: #1b2430;
+        --lm-muted: #8f9bad;
+        --lm-panel: #151c25;
+        --lm-selected: #1b3559;
+        --lm-text: #e6edf5;
+        --lm-green: #56c985;
+        --lm-green-soft: #123522;
+        --lm-red: #ff7b83;
+        --lm-red-soft: #3c1d23;
+        --d2h-dark-bg-color: #111820;
+        --d2h-dark-border-color: #2b3440;
+        --d2h-dark-file-header-bg-color: #18212b;
+        --d2h-dark-file-header-border-color: #2b3440;
+        --d2h-dark-line-border-color: #222c37;
+        --d2h-dark-ins-bg-color: #123522;
+        --d2h-dark-ins-border-color: #23583a;
+        --d2h-dark-ins-highlight-bg-color: #286342;
+        --d2h-dark-del-bg-color: #3c1d23;
+        --d2h-dark-del-border-color: #69313a;
+        --d2h-dark-del-highlight-bg-color: #733740;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        body.local-mr-auto {
+          --lm-accent: #6ea8fe;
+          --lm-accent-soft: #17345f;
+          --lm-bg: #0f141b;
+          --lm-border: #2b3440;
+          --lm-code-bg: #111820;
+          --lm-header-bg: #151c25;
+          --lm-hover: #1b2430;
+          --lm-muted: #8f9bad;
+          --lm-panel: #151c25;
+          --lm-selected: #1b3559;
+          --lm-text: #e6edf5;
+          --lm-green: #56c985;
+          --lm-green-soft: #123522;
+          --lm-red: #ff7b83;
+          --lm-red-soft: #3c1d23;
+          --d2h-dark-bg-color: #111820;
+          --d2h-dark-border-color: #2b3440;
+          --d2h-dark-file-header-bg-color: #18212b;
+          --d2h-dark-file-header-border-color: #2b3440;
+          --d2h-dark-line-border-color: #222c37;
+          --d2h-dark-ins-bg-color: #123522;
+          --d2h-dark-ins-border-color: #23583a;
+          --d2h-dark-ins-highlight-bg-color: #286342;
+          --d2h-dark-del-bg-color: #3c1d23;
+          --d2h-dark-del-border-color: #69313a;
+          --d2h-dark-del-highlight-bg-color: #733740;
+        }
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      body > h1 {
+        position: relative;
+        z-index: 4;
+        display: flex;
+        height: 54px;
+        margin: 0;
+        padding: 0 18px;
+        align-items: center;
+        gap: 10px;
+        overflow: hidden;
+        border-bottom: 1px solid var(--lm-border);
+        background: var(--lm-header-bg);
+        color: var(--lm-text) !important;
+        font-size: 13px;
+        font-weight: 500;
+        line-height: 1;
+        white-space: nowrap;
+      }
+
+      .local-mr-brand {
+        flex: 0 0 auto;
+        padding-right: 14px;
+        border-right: 1px solid var(--lm-border);
+        color: var(--lm-accent);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+      }
+
+      .local-mr-branch {
+        max-width: min(28vw, 420px);
+        overflow: hidden;
+        color: var(--lm-text);
+        font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+        font-size: 12px;
+        text-overflow: ellipsis;
+      }
+
+      .local-mr-target {
+        color: var(--lm-muted);
+      }
+
+      .local-mr-arrow {
+        flex: 0 0 auto;
+        color: var(--lm-muted);
+      }
+
+      .local-mr-summary {
+        display: flex;
+        margin-left: auto;
+        align-items: center;
+        gap: 12px;
+        color: var(--lm-muted);
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .local-mr-summary-added {
+        color: var(--lm-green);
+      }
+
+      .local-mr-summary-deleted {
+        color: var(--lm-red);
+      }
+
+      .local-mr-version-bar {
+        position: relative;
+        z-index: 5;
+        display: flex;
+        height: 50px;
+        padding: 8px 12px;
+        align-items: center;
+        border-bottom: 1px solid var(--lm-border);
+        background: var(--lm-panel);
+        color: var(--lm-text);
+        font-size: 14px;
+      }
+
+      .local-mr-version-control {
+        position: relative;
+        height: 32px;
+        flex: 0 0 auto;
+      }
+
+      .local-mr-version-mode {
+        width: 110px;
+      }
+
+      .local-mr-push-version {
+        width: 180px;
+      }
+
+      .local-mr-commit-range {
+        width: 280px;
+      }
+
+      .local-mr-version-trigger {
+        display: flex;
+        width: 100%;
+        height: 32px;
+        padding: 0 10px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        overflow: hidden;
+        border: 1px solid var(--lm-border);
+        border-radius: 4px;
+        background: var(--lm-panel);
+        color: var(--lm-text);
+        cursor: pointer;
+        font: inherit;
+        line-height: 30px;
+        text-align: left;
+        transition: border-color 140ms ease, box-shadow 140ms ease;
+      }
+
+      .local-mr-version-control + .local-mr-version-control .local-mr-version-trigger {
+        border-left: 0;
+        border-radius: 0 4px 4px 0;
+      }
+
+      .local-mr-version-mode .local-mr-version-trigger {
+        border-radius: 4px 0 0 4px;
+      }
+
+      .local-mr-version-control.local-mr-open .local-mr-version-trigger,
+      .local-mr-version-trigger:focus-visible {
+        z-index: 1;
+        border-color: var(--lm-accent);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--lm-accent) 14%, transparent);
+      }
+
+      .local-mr-version-trigger-label {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .local-mr-version-chevron {
+        flex: 0 0 auto;
+        color: var(--lm-muted);
+        font-size: 14px;
+        transform: rotate(90deg);
+        transition: transform 140ms ease;
+      }
+
+      .local-mr-version-control.local-mr-open .local-mr-version-chevron {
+        transform: rotate(-90deg);
+      }
+
+      .local-mr-version-arrow {
+        display: grid;
+        width: 30px;
+        height: 32px;
+        flex: 0 0 30px;
+        place-items: center;
+        color: var(--lm-muted);
+        font-size: 15px;
+      }
+
+      .local-mr-version-menu {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        z-index: 20;
+        width: 320px;
+        max-height: min(416px, calc(100vh - 128px));
+        overflow: auto;
+        border: 1px solid var(--lm-border);
+        border-radius: 4px;
+        background: var(--lm-panel);
+        box-shadow: 0 6px 18px color-mix(in srgb, #000000 16%, transparent);
+        scrollbar-color: var(--lm-border) transparent;
+        scrollbar-width: thin;
+      }
+
+      .local-mr-version-mode .local-mr-version-menu {
+        width: 110px;
+      }
+
+      .local-mr-commit-range .local-mr-version-menu {
+        width: 400px;
+      }
+
+      .local-mr-version-option {
+        display: flex;
+        width: 100%;
+        min-height: 58px;
+        padding: 7px 12px;
+        flex-direction: column;
+        justify-content: center;
+        border: 0;
+        background: transparent;
+        color: var(--lm-text);
+        cursor: pointer;
+        font: inherit;
+        text-align: left;
+      }
+
+      .local-mr-version-mode .local-mr-version-option {
+        min-height: 32px;
+        padding: 5px 12px;
+      }
+
+      .local-mr-version-option:hover {
+        background: var(--lm-hover);
+      }
+
+      .local-mr-version-option.local-mr-selected {
+        background: var(--lm-selected);
+      }
+
+      .local-mr-version-option-title {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        overflow: hidden;
+        font-size: 14px;
+        line-height: 21px;
+      }
+
+      .local-mr-version-option-title > span:first-child {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .local-mr-version-option-description {
+        overflow: hidden;
+        color: var(--lm-muted);
+        font-size: 12px;
+        line-height: 19px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .local-mr-commit-section-label {
+        display: flex;
+        height: 36px;
+        padding: 0 12px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-top: 1px solid var(--lm-border);
+        border-bottom: 1px solid var(--lm-border);
+        color: var(--lm-text);
+        font-size: 14px;
+      }
+
+      .local-mr-commit-section-label small {
+        overflow: hidden;
+        color: var(--lm-muted);
+        font-size: 12px;
+        font-weight: 400;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .local-mr-commit-option {
+        min-height: 58px;
+      }
+
+      .local-mr-commit-check {
+        width: 8px;
+        height: 8px;
+        flex: 0 0 8px;
+        border: 1px solid var(--lm-border);
+        border-radius: 50%;
+        background: var(--lm-panel);
+      }
+
+      .local-mr-commit-option.local-mr-selected .local-mr-commit-check {
+        border-color: var(--lm-accent);
+        background: var(--lm-accent);
+        box-shadow: inset 0 0 0 2px var(--lm-panel);
+      }
+
+      .local-mr-version-loading::after {
+        position: fixed;
+        inset: 104px 0 0;
+        z-index: 50;
+        display: grid;
+        place-items: start center;
+        padding-top: 28px;
+        background: color-mix(in srgb, var(--lm-bg) 78%, transparent);
+        color: var(--lm-muted);
+        content: "Generating version diff…";
+        font-size: 12px;
+        backdrop-filter: blur(1px);
+      }
+
+      #diff {
+        display: grid;
+        height: calc(100% - 54px);
+        min-height: 0;
+        grid-template-columns: 320px minmax(0, 1fr);
+      }
+
+      body.local-mr-has-version-bar #diff {
+        height: calc(100% - 104px);
+      }
+
+      #diff > .d2h-file-list-wrapper {
+        min-width: 0;
+        height: 100%;
+        margin: 0;
+        overflow: auto;
+        border-right: 1px solid var(--lm-border);
+        background: var(--lm-panel) !important;
+        color: var(--lm-text) !important;
+        scrollbar-color: var(--lm-border) transparent;
+        scrollbar-width: thin;
+      }
+
+      .d2h-file-list-header {
+        position: sticky;
+        top: 0;
+        z-index: 3;
+        display: flex;
+        padding: 14px 12px 11px;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        border-bottom: 1px solid var(--lm-border);
+        background: var(--lm-panel);
+      }
+
+      .d2h-file-list-title {
+        color: var(--lm-text);
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      .d2h-file-switch {
+        display: none !important;
+      }
+
+      .local-mr-search-label {
+        position: relative;
+        display: block;
+        width: 100%;
+      }
+
+      .local-mr-search-label::before {
+        position: absolute;
+        top: 50%;
+        left: 10px;
+        color: var(--lm-muted);
+        content: "⌕";
+        font-size: 16px;
+        line-height: 1;
+        transform: translateY(-54%);
+      }
+
+      .local-mr-search {
+        width: 100%;
+        height: 32px;
+        padding: 0 9px 0 30px;
+        outline: none;
+        border: 1px solid var(--lm-border);
+        border-radius: 4px;
+        background: var(--lm-bg);
+        color: var(--lm-text);
+        font: inherit;
+        font-size: 12px;
+        transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+      }
+
+      .local-mr-search::placeholder {
+        color: var(--lm-muted);
+      }
+
+      .local-mr-search:focus {
+        border-color: var(--lm-accent);
+        background: var(--lm-panel);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--lm-accent) 16%, transparent);
+      }
+
+      .d2h-file-list {
+        display: block !important;
+        margin: 0;
+        padding: 6px 0 20px;
+        list-style: none;
+      }
+
+      .local-mr-tree li {
+        margin: 0;
+        padding: 0 !important;
+        border: 0 !important;
+        list-style: none;
+      }
+
+      .local-mr-tree .d2h-file-list-line {
+        cursor: pointer;
+      }
+
+      .local-mr-tree li[hidden] {
+        display: none;
+      }
+
+      .local-mr-tree-children {
+        margin: 0;
+        padding: 0 0 0 14px;
+        list-style: none;
+      }
+
+      .local-mr-tree-directory-row {
+        display: flex;
+        width: 100%;
+        height: 24px;
+        padding: 0 9px;
+        align-items: center;
+        overflow: hidden;
+        border: 0;
+        background: transparent;
+        color: var(--lm-muted);
+        cursor: pointer;
+        font: inherit;
+        font-size: 12px;
+        text-align: left;
+        transition: background 140ms ease, color 140ms ease;
+      }
+
+      .local-mr-tree-directory-row:hover {
+        background: var(--lm-hover);
+        color: var(--lm-text);
+      }
+
+      .local-mr-tree-chevron {
+        width: 12px;
+        flex: 0 0 12px;
+        font-size: 13px;
+        transform: rotate(90deg);
+        transform-origin: center;
+        transition: transform 140ms ease;
+      }
+
+      .local-mr-tree-directory.local-mr-collapsed > .local-mr-tree-directory-row .local-mr-tree-chevron {
+        transform: rotate(0deg);
+      }
+
+      .local-mr-tree-folder-icon {
+        position: relative;
+        width: 12px;
+        height: 9px;
+        margin: 1px 7px 0 2px;
+        flex: 0 0 12px;
+        border-radius: 1px;
+        background: color-mix(in srgb, var(--lm-muted) 76%, transparent);
+      }
+
+      .local-mr-tree-folder-icon::before {
+        position: absolute;
+        top: -3px;
+        left: 1px;
+        width: 6px;
+        height: 4px;
+        border-radius: 1px 1px 0 0;
+        background: inherit;
+        content: "";
+      }
+
+      .local-mr-tree-directory-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .d2h-file-list-line .d2h-file-name-wrapper {
+        min-width: 0;
+        min-height: 24px;
+        padding: 2px 9px;
+        gap: 0;
+        border-left: 2px solid transparent;
+        transition: background 140ms ease, border-color 140ms ease;
+      }
+
+      .d2h-file-list-line:hover .d2h-file-name-wrapper {
+        background: var(--lm-hover);
+      }
+
+      .d2h-file-list-line.local-mr-active .d2h-file-name-wrapper {
+        border-left-color: var(--lm-accent);
+        background: var(--lm-selected);
+      }
+
+      .d2h-file-list-line.local-mr-active .d2h-file-name {
+        color: var(--lm-accent) !important;
+      }
+
+      .d2h-file-list-line .d2h-icon {
+        width: 13px;
+        height: 13px;
+        margin-right: 8px;
+        flex: 0 0 auto;
+      }
+
+      .d2h-file-list-line .d2h-file-name {
+        display: flex;
+        min-width: 0;
+        flex: 1 1 auto;
+        overflow: hidden;
+        align-items: baseline;
+        color: var(--lm-text) !important;
+        font-family: "Segoe UI Variable Text", "Segoe UI", "PingFang SC", Arial, sans-serif;
+        font-size: 12px;
+        line-height: 19px;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+
+      .local-mr-file-read-status {
+        display: inline-flex;
+        position: relative;
+        width: 24px;
+        height: 24px;
+        margin-left: 3px;
+        flex: 0 0 24px;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        appearance: none;
+        background: transparent;
+        cursor: pointer;
+      }
+
+      .local-mr-file-read-status:hover {
+        background: color-mix(in srgb, var(--lm-accent) 10%, transparent);
+      }
+
+      .local-mr-file-read-status::before {
+        width: 14px;
+        height: 14px;
+        box-sizing: border-box;
+        border: 1px solid color-mix(in srgb, var(--lm-accent) 72%, var(--lm-border));
+        border-radius: 50%;
+        background: transparent;
+        content: "";
+      }
+
+      .d2h-file-list-line.local-mr-read .local-mr-file-read-status::before {
+        border-color: var(--lm-accent);
+        background: var(--lm-accent);
+      }
+
+      .d2h-file-list-line.local-mr-read .local-mr-file-read-status::after {
+        position: absolute;
+        color: #fff;
+        content: "✓";
+        font-family: Arial, sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1;
+      }
+
+      .local-mr-visually-hidden {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        margin: -1px !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        clip: rect(0 0 0 0) !important;
+        clip-path: inset(50%) !important;
+        border: 0 !important;
+        white-space: nowrap !important;
+      }
+
+      .local-mr-basename {
+        min-width: 0;
+        max-width: 100%;
+        flex: 1 1 auto;
+        overflow: hidden;
+        font-weight: 600;
+        text-overflow: ellipsis;
+      }
+
+      .d2h-file-list-line .d2h-file-stats {
+        margin-left: 8px;
+        flex: 0 0 auto;
+        gap: 6px;
+        font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+        font-size: 10px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .d2h-file-list-line .d2h-lines-added,
+      .d2h-file-list-line .d2h-lines-deleted {
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+      }
+
+      .d2h-file-list-line .d2h-lines-added {
+        color: var(--lm-green);
+      }
+
+      .d2h-file-list-line .d2h-lines-deleted {
+        margin-left: 0;
+        color: var(--lm-red);
+      }
+
+      .local-mr-empty {
+        padding: 28px 16px !important;
+        color: var(--lm-muted);
+        cursor: default !important;
+        font-size: 12px;
+        text-align: center;
+      }
+
+      #diff > .d2h-wrapper {
+        position: relative;
+        min-width: 0;
+        height: 100%;
+        padding: 18px 20px 70px;
+        overflow: auto;
+        background: var(--lm-bg) !important;
+        color: var(--lm-text) !important;
+        scrollbar-color: var(--lm-border) transparent;
+        scrollbar-width: thin;
+      }
+
+      #diff > .d2h-wrapper.local-mr-fragment-loading::after {
+        position: absolute;
+        inset: 18px 20px auto;
+        display: grid;
+        min-height: 72px;
+        place-items: center;
+        border: 1px solid var(--lm-border);
+        border-radius: 5px;
+        background: var(--lm-code-bg);
+        color: var(--lm-muted);
+        content: "Loading file diff…";
+        font-size: 12px;
+      }
+
+      .d2h-file-wrapper {
+        margin: 0 0 18px;
+        border: 1px solid var(--lm-border) !important;
+        border-radius: 5px;
+        background: var(--lm-code-bg);
+        box-shadow: 0 1px 2px color-mix(in srgb, var(--lm-text) 6%, transparent);
+        scroll-margin-top: 12px;
+      }
+
+      .d2h-file-wrapper[hidden] {
+        display: none !important;
+      }
+
+      .d2h-file-header {
+        position: sticky;
+        top: -1px;
+        z-index: 2;
+        height: 50px;
+        padding: 6px 10px;
+        align-items: center;
+        border-bottom: 1px solid var(--lm-border) !important;
+        border-radius: 5px 5px 0 0;
+        background: var(--lm-header-bg) !important;
+        color: var(--lm-text);
+        font-family: "Segoe UI Variable Text", "Segoe UI", Arial, sans-serif;
+      }
+
+      .d2h-file-header .d2h-file-name-wrapper {
+        width: auto;
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+
+      .d2h-file-header .d2h-file-name {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        color: var(--lm-text);
+        font-family: "Segoe UI Variable Text", "Segoe UI", "PingFang SC", Arial, sans-serif;
+      }
+
+      .local-mr-file-basename {
+        overflow: hidden;
+        font-size: 12px;
+        font-weight: 650;
+        line-height: 17px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .local-mr-file-directory {
+        overflow: hidden;
+        color: var(--lm-muted);
+        font-size: 10px;
+        font-weight: 400;
+        line-height: 14px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .d2h-file-header .d2h-icon {
+        width: 14px;
+        height: 14px;
+        margin-right: 8px;
+      }
+
+      .d2h-file-header .d2h-file-stats {
+        align-items: center;
+        gap: 0;
+        font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .d2h-file-header .d2h-tag {
+        display: none !important;
+      }
+
+      .local-mr-file-actions {
+        display: flex;
+        margin-left: 10px;
+        flex: 0 0 auto;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .local-mr-file-action {
+        height: 28px;
+        padding: 0 9px;
+        flex: 0 0 auto;
+        border: 1px solid var(--lm-border);
+        border-radius: 4px;
+        background: var(--lm-panel);
+        color: var(--lm-muted);
+        cursor: pointer;
+        font: inherit;
+        font-size: 11px;
+        line-height: 26px;
+        white-space: nowrap;
+        transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+      }
+
+      .local-mr-file-action:hover,
+      .local-mr-file-action:focus-visible {
+        border-color: var(--lm-accent);
+        background: var(--lm-accent-soft);
+        color: var(--lm-accent);
+        outline: none;
+      }
+
+      .local-mr-file-action:active {
+        transform: translateY(1px);
+      }
+
+      .local-mr-file-mode {
+        display: flex;
+      }
+
+      .local-mr-file-mode .local-mr-file-action {
+        border-radius: 0;
+      }
+
+      .local-mr-file-mode .local-mr-file-action:first-child {
+        border-radius: 4px 0 0 4px;
+      }
+
+      .local-mr-file-mode .local-mr-file-action:last-child {
+        margin-left: -1px;
+        border-radius: 0 4px 4px 0;
+      }
+
+      .local-mr-file-action.local-mr-selected {
+        position: relative;
+        z-index: 1;
+        border-color: var(--lm-accent);
+        background: var(--lm-accent-soft);
+        color: var(--lm-accent);
+      }
+
+      .local-mr-markdown-preview {
+        min-height: 260px;
+        padding: 36px clamp(28px, 5vw, 72px) 64px;
+        background: var(--lm-code-bg);
+      }
+
+      .local-mr-markdown-preview[hidden] {
+        display: none !important;
+      }
+
+      .local-mr-preview-loading,
+      .local-mr-preview-error {
+        max-width: 920px;
+        margin: 30px auto;
+        padding: 18px 20px;
+        border: 1px solid var(--lm-border);
+        border-radius: 5px;
+        background: var(--lm-bg);
+        color: var(--lm-muted);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      .local-mr-preview-error {
+        border-color: color-mix(in srgb, var(--lm-red) 38%, var(--lm-border));
+        color: var(--lm-red);
+      }
+
+      .local-mr-markdown-body {
+        max-width: 920px;
+        margin: 0 auto;
+        color: var(--lm-text);
+        font-size: 14px;
+        line-height: 1.72;
+        overflow-wrap: break-word;
+      }
+
+      .local-mr-markdown-body > :first-child {
+        margin-top: 0;
+      }
+
+      .local-mr-markdown-body h1,
+      .local-mr-markdown-body h2,
+      .local-mr-markdown-body h3,
+      .local-mr-markdown-body h4 {
+        margin: 1.7em 0 0.65em;
+        color: var(--lm-text);
+        font-weight: 650;
+        line-height: 1.3;
+      }
+
+      .local-mr-markdown-body h1 {
+        padding-bottom: 0.35em;
+        border-bottom: 1px solid var(--lm-border);
+        font-size: 26px;
+      }
+
+      .local-mr-markdown-body h2 {
+        padding-bottom: 0.3em;
+        border-bottom: 1px solid var(--lm-border);
+        font-size: 21px;
+      }
+
+      .local-mr-markdown-body h3 {
+        font-size: 17px;
+      }
+
+      .local-mr-markdown-body p,
+      .local-mr-markdown-body ul,
+      .local-mr-markdown-body ol,
+      .local-mr-markdown-body blockquote,
+      .local-mr-markdown-body pre,
+      .local-mr-markdown-body table {
+        margin: 0 0 16px;
+      }
+
+      .local-mr-markdown-body a {
+        color: var(--lm-accent);
+        text-underline-offset: 2px;
+      }
+
+      .local-mr-markdown-body blockquote {
+        padding: 2px 14px;
+        border-left: 3px solid var(--lm-border);
+        color: var(--lm-muted);
+      }
+
+      .local-mr-markdown-body code {
+        padding: 0.15em 0.35em;
+        border-radius: 3px;
+        background: var(--lm-bg);
+        font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+        font-size: 0.9em;
+      }
+
+      .local-mr-markdown-body pre {
+        padding: 14px 16px;
+        overflow: auto;
+        border: 1px solid var(--lm-border);
+        border-radius: 5px;
+        background: var(--lm-bg);
+        line-height: 1.55;
+      }
+
+      .local-mr-markdown-body pre code {
+        padding: 0;
+        background: transparent;
+      }
+
+      .local-mr-markdown-body table {
+        display: block;
+        width: max-content;
+        max-width: 100%;
+        overflow: auto;
+        border-spacing: 0;
+        border-collapse: collapse;
+      }
+
+      .local-mr-markdown-body th,
+      .local-mr-markdown-body td {
+        padding: 8px 12px;
+        border: 1px solid var(--lm-border);
+        text-align: left;
+      }
+
+      .local-mr-markdown-body th {
+        background: var(--lm-bg);
+        font-weight: 600;
+      }
+
+      .local-mr-markdown-body img,
+      .local-mr-markdown-body svg {
+        max-width: 100%;
+      }
+
+      .local-mr-mermaid {
+        margin: 22px 0;
+        padding: 18px;
+        overflow: auto;
+        border: 1px solid var(--lm-border);
+        border-radius: 5px;
+        background: var(--lm-panel);
+        text-align: center;
+      }
+
+      .local-mr-mermaid.local-mr-preview-error {
+        text-align: left;
+        white-space: pre-wrap;
+      }
+
+      .d2h-file-header .d2h-lines-added,
+      .d2h-file-header .d2h-lines-deleted {
+        min-width: 34px;
+        padding: 3px 6px;
+        text-align: center;
+      }
+
+      .d2h-file-collapse {
+        margin-left: 8px;
+        padding: 4px;
+        border: 0 !important;
+        background: transparent;
+        color: var(--lm-muted);
+        font-size: 10px;
+        transition: background 140ms ease, color 140ms ease;
+      }
+
+      .d2h-file-collapse:hover {
+        background: var(--lm-hover);
+        color: var(--lm-text);
+      }
+
+      .d2h-file-collapse-input {
+        accent-color: var(--lm-accent);
+        transform: scale(0.86);
+      }
+
+      .d2h-file-collapse {
+        display: none !important;
+      }
+
+      .local-mr-split-diff {
+        width: 100%;
+        overflow: visible;
+        background: var(--lm-code-bg);
+      }
+
+      .local-mr-split-table {
+        width: 100%;
+        table-layout: fixed;
+      }
+
+      .local-mr-split-table .local-mr-gutter-column {
+        width: 46px;
+      }
+
+      .local-mr-split-table .local-mr-code-column {
+        width: calc(50% - 46px);
+      }
+
+      .local-mr-split-table td:nth-child(2) {
+        border-right: 1px solid var(--lm-border);
+      }
+
+      .local-mr-split-table .d2h-code-side-linenumber {
+        display: table-cell;
+        position: static;
+        width: 46px;
+        min-width: 46px;
+        padding: 0 7px;
+        vertical-align: top;
+      }
+
+      .local-mr-split-table td:nth-child(2),
+      .local-mr-split-table td:nth-child(4) {
+        width: calc(50% - 46px);
+        vertical-align: top;
+      }
+
+      .local-mr-split-table .d2h-code-side-line {
+        display: block;
+        width: auto;
+        min-height: 20px;
+        padding: 0 8px;
+        white-space: normal;
+        word-break: normal;
+        overflow-wrap: normal;
+      }
+
+      .local-mr-split-table .d2h-code-line-ctn {
+        display: inline;
+        width: auto;
+        white-space: pre-wrap;
+        word-break: break-all;
+        overflow-wrap: break-word;
+      }
+
+      .d2h-diff-table {
+        background: var(--lm-code-bg);
+        color: var(--lm-text);
+        font-family: "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        font-size: 12px;
+        line-height: 20px;
+        font-variant-ligatures: none;
+      }
+
+      .d2h-code-side-linenumber,
+      .d2h-code-linenumber {
+        color: var(--lm-muted) !important;
+        font-size: 10px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .d2h-info {
+        color: var(--lm-muted) !important;
+      }
+
+      .local-mr-context-decoration > .d2h-info,
+      .local-mr-context-footer > .d2h-info {
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        background: var(--d2h-info-bg-color, var(--lm-accent-soft)) !important;
+      }
+
+      .local-mr-context-decoration > :first-child,
+      .local-mr-context-footer > :first-child {
+        padding: 0 !important;
+        box-shadow: inset -1px 0 0 color-mix(in srgb, var(--lm-text) 12%, transparent);
+        font-size: 0;
+        line-height: 0;
+        vertical-align: middle !important;
+      }
+
+      .local-mr-context-controls {
+        display: flex;
+        min-height: 26px;
+        flex-direction: column;
+      }
+
+      .local-mr-context-button {
+        display: grid;
+        width: 100%;
+        min-width: 34px;
+        min-height: 26px;
+        padding: 0 6px;
+        place-items: center;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        font: 600 14px/1 "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+        transition: background 120ms ease, color 120ms ease;
+      }
+
+      .local-mr-context-controls.local-mr-context-multiple .local-mr-context-button {
+        min-height: 14px;
+        padding: 0;
+        font-size: 10px;
+      }
+
+      .local-mr-context-button:hover,
+      .local-mr-context-button:focus-visible {
+        background: var(--lm-accent);
+        color: #fff;
+        outline: none;
+      }
+
+      .local-mr-context-button:disabled {
+        cursor: wait;
+        opacity: 0.55;
+      }
+
+      .local-mr-context-inline {
+        display: inline-grid;
+        width: 30px;
+        min-width: 30px;
+        height: 20px;
+        margin-right: 8px;
+        vertical-align: middle;
+      }
+
+      .local-mr-context-inline .local-mr-context-button {
+        min-width: 30px;
+        min-height: 20px;
+        padding: 0;
+        border-radius: 3px;
+      }
+
+      .local-mr-context-hunk {
+        display: flex !important;
+        min-height: 26px;
+        align-items: center;
+      }
+
+      .local-mr-context-footer .d2h-info:last-child {
+        min-height: 26px;
+      }
+
+      .local-mr-expanded-context .d2h-cntx {
+        background: var(--lm-code-bg) !important;
+      }
+
+      .d2h-code-line-ctn {
+        tab-size: 4;
+      }
+
+      .d2h-added {
+        color: var(--lm-green) !important;
+      }
+
+      .d2h-deleted {
+        color: var(--lm-red) !important;
+      }
+
+      a:focus-visible,
+      button:focus-visible,
+      input:focus-visible {
+        outline: 2px solid var(--lm-accent);
+        outline-offset: 2px;
+      }
+
+      @media (max-width: 980px) {
+        .local-mr-push-version {
+          width: 160px;
+        }
+
+        .local-mr-commit-range {
+          width: 240px;
+        }
+
+        #diff {
+          grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+        }
+
+        .local-mr-summary {
+          gap: 8px;
+        }
+
+        #diff > .d2h-wrapper {
+          padding-right: 12px;
+          padding-left: 12px;
+        }
+      }
+    </style>
+
+    <script id="local-mr-review-behaviour">
+      (() => {
+        let activeSession;
+        let versionNavigationSequence = 0;
+        const libraryLoads = new Map();
+
+        const selectionsMatch = (left, right) => Boolean(
+          left
+          && right
+          && left.mode === right.mode
+          && left.from === right.from
+          && left.to === right.to
+        );
+
+        const readVersionData = () => {
+          const element = document.getElementById("local-mr-version-data");
+          if (!element) return { element: null, value: null };
+          try {
+            return { element, value: JSON.parse(element.textContent) };
+          } catch (error) {
+            console.error("Local MR could not parse version data", error);
+            return { element, value: null };
+          }
+        };
+
+        const reviewUrlForSelection = (versionData, selection) => {
+          const url = new URL(versionData.reviewUrl, document.baseURI);
+          url.searchParams.set("mode", selection.mode);
+          url.searchParams.set("from", selection.from);
+          url.searchParams.set("to", selection.to);
+          url.hash = location.hash;
+          return url;
+        };
+
+        const reviewDataUrlForSelection = (versionData, selection) => {
+          const url = new URL(versionData.reviewDataUrl, document.baseURI);
+          const reviewUrl = reviewUrlForSelection(versionData, selection);
+          url.search = reviewUrl.search;
+          return url;
+        };
+
+        const replaceReviewPayload = (payload) => {
+          const template = document.createElement("template");
+          template.innerHTML = String(payload?.diffHtml || "").trim();
+          const nextDiff = template.content.firstElementChild;
+          const body = document.body;
+          const heading = body.querySelector(":scope > h1");
+          const currentDiff = document.getElementById("diff");
+          const { element: versionDataElement } = readVersionData();
+          if (
+            nextDiff?.id !== "diff"
+            || !heading
+            || !currentDiff
+            || !versionDataElement
+            || !payload?.versionData
+          ) {
+            throw new Error("The version response is missing complete review data");
+          }
+          body.querySelector(":scope > .local-mr-version-bar")?.remove();
+          currentDiff.replaceWith(nextDiff);
+          heading.textContent = payload.heading;
+          heading.title = payload.heading;
+          versionDataElement.textContent = JSON.stringify(payload.versionData);
+          document.title = payload.title;
+        };
+
+        const fetchVersionPayload = async (versionData, selection, signal) => {
+          const response = await fetch(reviewDataUrlForSelection(versionData, selection), {
+            headers: { Accept: "application/json" },
+            signal,
+          });
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.error || `Could not load version: ${response.status}`);
+          return payload;
+        };
+
+        const initializeReview = async () => {
+          activeSession?.abort();
+          activeSession = new AbortController();
+          const { signal } = activeSession;
+          const body = document.body;
+        const diff = document.getElementById("diff");
+        const sidebar = diff?.querySelector(":scope > .d2h-file-list-wrapper");
+        const details = diff?.querySelector(":scope > .d2h-wrapper");
+        const heading = body.querySelector(":scope > h1");
+
+        if (!diff || !sidebar || !details || !heading) {
+          return;
+        }
+
+        const colorRoot = diff.querySelector(".d2h-wrapper");
+        if (colorRoot?.classList.contains("d2h-dark-color-scheme")) {
+          body.classList.add("local-mr-dark");
+        } else if (colorRoot?.classList.contains("d2h-auto-color-scheme")) {
+          body.classList.add("local-mr-auto");
+        }
+
+        const makeSpan = (className, text) => {
+          const span = document.createElement("span");
+          span.className = className;
+          span.textContent = text;
+          return span;
+        };
+
+        const { element: versionDataElement, value: versionData } = readVersionData();
+        const readTokensPromise = versionData?.readStateUrl
+          ? fetch(versionData.readStateUrl, { headers: { Accept: "application/json" } })
+            .then((response) => {
+              if (!response.ok) throw new Error(`Could not load read state: ${response.status}`);
+              return response.json();
+            })
+            .then((payload) => Array.isArray(payload.tokens) ? payload.tokens : [])
+            .catch(() => [])
+          : Promise.resolve([]);
+
+        const loadLibrary = (source, globalName) => {
+          if (window[globalName]) return Promise.resolve(window[globalName]);
+          if (libraryLoads.has(source)) return libraryLoads.get(source);
+          const loading = new Promise((resolve, reject) => {
+            const script = document.createElement("script");
+            script.src = source;
+            script.addEventListener("load", () => {
+              if (window[globalName]) resolve(window[globalName]);
+              else reject(new Error(`${globalName} did not load`));
+            }, { once: true });
+            script.addEventListener("error", () => {
+              reject(new Error(`Could not load Markdown preview dependency: ${globalName}`));
+            }, { once: true });
+            document.head.append(script);
+          }).catch((error) => {
+            libraryLoads.delete(source);
+            throw error;
+          });
+          libraryLoads.set(source, loading);
+          return loading;
+        };
+
+        const renderMarkdown = async (filePath, container) => {
+          container.textContent = "";
+          container.append(makeSpan("local-mr-preview-loading", "Generating Markdown preview…"));
+          try {
+            const previewUrl = new URL(versionData.previewUrl, document.baseURI);
+            previewUrl.searchParams.set("mode", versionData.selection.mode);
+            previewUrl.searchParams.set("from", versionData.selection.from);
+            previewUrl.searchParams.set("to", versionData.selection.to);
+            previewUrl.searchParams.set("path", filePath);
+            const previewPayload = fetch(previewUrl, { headers: { Accept: "application/json" } })
+              .then(async (response) => {
+                const payload = await response.json();
+                if (!response.ok) throw new Error(payload.error || "Could not read Markdown file");
+                return payload;
+              });
+            const [payload] = await Promise.all([
+              previewPayload,
+              loadLibrary(versionData.assets.marked, "marked"),
+              loadLibrary(versionData.assets.dompurify, "DOMPurify"),
+            ]);
+
+            const article = document.createElement("article");
+            article.className = "local-mr-markdown-body";
+            const rendered = window.marked.parse(payload.content, { gfm: true });
+            article.innerHTML = window.DOMPurify.sanitize(rendered, {
+              USE_PROFILES: { html: true },
+            });
+            article.querySelectorAll("a[href]").forEach((link) => {
+              link.target = "_blank";
+              link.rel = "noopener noreferrer";
+            });
+            const mermaidNodes = [...article.querySelectorAll("pre > code.language-mermaid")]
+              .map((code) => {
+                const diagram = document.createElement("div");
+                diagram.className = "local-mr-mermaid";
+                diagram.textContent = code.textContent;
+                code.parentElement.replaceWith(diagram);
+                return diagram;
+              });
+            container.replaceChildren(article);
+            if (mermaidNodes.length > 0) {
+              await loadLibrary(versionData.assets.mermaid, "mermaid");
+              const dark = body.classList.contains("local-mr-dark")
+                || (body.classList.contains("local-mr-auto")
+                  && matchMedia("(prefers-color-scheme: dark)").matches);
+              window.mermaid.initialize({
+                startOnLoad: false,
+                securityLevel: "strict",
+                suppressErrorRendering: true,
+                theme: dark ? "dark" : "default",
+                fontFamily: "Segoe UI, PingFang SC, sans-serif",
+              });
+              for (const diagram of mermaidNodes) {
+                const source = diagram.textContent;
+                try {
+                  await window.mermaid.parse(source);
+                  await window.mermaid.run({ nodes: [diagram], suppressErrors: true });
+                  if (!diagram.querySelector("svg")) {
+                    throw new Error("No diagram was generated");
+                  }
+                } catch (error) {
+                  diagram.className = "local-mr-mermaid local-mr-preview-error";
+                  diagram.textContent = `Mermaid rendering failed: ${error.message}\n\n${source}`;
+                }
+              }
+            }
+            return true;
+          } catch (error) {
+            const message = document.createElement("div");
+            message.className = "local-mr-preview-error";
+            message.textContent = error.message;
+            container.replaceChildren(message);
+            return false;
+          }
+        };
+
+        const navigateToVersion = async (selection) => {
+          if (selectionsMatch(selection, versionData.selection)) {
+            return false;
+          }
+          const url = reviewUrlForSelection(versionData, selection);
+          const current = new URL(location.href);
+          const sameSelection = current.origin === url.origin
+            && current.pathname === url.pathname
+            && current.searchParams.get("mode") === selection.mode
+            && current.searchParams.get("from") === selection.from
+            && current.searchParams.get("to") === selection.to
+            && current.hash === url.hash;
+          if (sameSelection) return false;
+          body.classList.add("local-mr-version-loading");
+          document.documentElement.classList.remove("local-mr-ready");
+          const navigationSequence = ++versionNavigationSequence;
+          try {
+            const payload = await fetchVersionPayload(versionData, selection, signal);
+            if (navigationSequence !== versionNavigationSequence) return false;
+            replaceReviewPayload(payload);
+            history.pushState(null, "", url);
+            await initializeReview();
+          } catch (error) {
+            if (error.name === "AbortError") return false;
+            location.assign(url);
+          }
+          return true;
+        };
+
+        const buildVersionBar = () => {
+          if (!versionData?.pushVersions?.length) {
+            return;
+          }
+
+          const versionBar = document.createElement("div");
+          versionBar.className = "local-mr-version-bar";
+          const openControls = new Set();
+          const closeMenus = (except) => {
+            openControls.forEach((control) => {
+              if (control === except) return;
+              control.classList.remove("local-mr-open");
+              const menu = control.querySelector(":scope > .local-mr-version-menu");
+              const trigger = control.querySelector(":scope > .local-mr-version-trigger");
+              if (menu) menu.hidden = true;
+              trigger?.setAttribute("aria-expanded", "false");
+              openControls.delete(control);
+            });
+          };
+
+          const makeControl = (className, label) => {
+            const control = document.createElement("div");
+            control.className = `local-mr-version-control ${className}`;
+            const trigger = document.createElement("button");
+            trigger.type = "button";
+            trigger.className = "local-mr-version-trigger";
+            trigger.title = label;
+            trigger.setAttribute("aria-haspopup", "listbox");
+            trigger.setAttribute("aria-expanded", "false");
+            trigger.append(
+              makeSpan("local-mr-version-trigger-label", label),
+              makeSpan("local-mr-version-chevron", "›"),
+            );
+            const menu = document.createElement("div");
+            menu.className = "local-mr-version-menu";
+            menu.setAttribute("role", "listbox");
+            menu.hidden = true;
+            trigger.addEventListener("click", (event) => {
+              event.stopPropagation();
+              const opening = menu.hidden;
+              closeMenus(opening ? control : null);
+              menu.hidden = !opening;
+              control.classList.toggle("local-mr-open", opening);
+              trigger.setAttribute("aria-expanded", String(opening));
+              if (opening) openControls.add(control);
+              else openControls.delete(control);
+            });
+            control.append(trigger, menu);
+            return { control, trigger, menu };
+          };
+
+          const appendOption = ({ menu, title, description, selected, className = "", onClick }) => {
+            const option = document.createElement("button");
+            option.type = "button";
+            option.className = `local-mr-version-option ${className}`.trim();
+            option.classList.toggle("local-mr-selected", selected);
+            option.setAttribute("role", "option");
+            option.setAttribute("aria-selected", String(selected));
+            const titleRow = makeSpan("local-mr-version-option-title", "");
+            titleRow.append(makeSpan("", title));
+            option.append(titleRow);
+            if (description) {
+              option.append(makeSpan("local-mr-version-option-description", description));
+            }
+            option.addEventListener("click", (event) => {
+              event.stopPropagation();
+              if (onClick(event) === false) closeMenus();
+            });
+            menu.append(option);
+            return { option, titleRow };
+          };
+
+          const modeControl = makeControl(
+            "local-mr-version-mode",
+            versionData.mode === "commits" ? "Commits" : "Pushes",
+          );
+          [
+            { value: "push", label: "Pushes" },
+            { value: "commits", label: "Commits" },
+          ].forEach((mode) => {
+            appendOption({
+              menu: modeControl.menu,
+              title: mode.label,
+              selected: versionData.mode === mode.value,
+              onClick: () => {
+                if (mode.value === versionData.mode) {
+                  closeMenus();
+                  return;
+                }
+                if (mode.value === "commits" && versionData.commits.length > 0) {
+                  navigateToVersion({
+                    mode: "commits",
+                    from: versionData.commits[0].sha,
+                    to: versionData.commits.at(-1).sha,
+                  });
+                } else {
+                  navigateToVersion({
+                    mode: "push",
+                    from: "base",
+                    to: versionData.pushVersions.at(-1).value,
+                  });
+                }
+              },
+            });
+          });
+          versionBar.append(modeControl.control);
+
+          if (versionData.mode === "push") {
+            const selectedFrom = versionData.pushVersions.find((version) => {
+              return version.value === versionData.selection.from;
+            });
+            const selectedTo = versionData.pushVersions.find((version) => {
+              return version.value === versionData.selection.to;
+            });
+            const fromIndex = versionData.pushVersions.indexOf(selectedFrom);
+            const toIndex = versionData.pushVersions.indexOf(selectedTo);
+            const fromControl = makeControl("local-mr-push-version", selectedFrom.label);
+            versionData.pushVersions.slice(0, toIndex).forEach((version) => {
+              appendOption({
+                menu: fromControl.menu,
+                title: version.label,
+                description: version.description,
+                selected: version.value === selectedFrom.value,
+                onClick: () => navigateToVersion({
+                  mode: "push",
+                  from: version.value,
+                  to: selectedTo.value,
+                }),
+              });
+            });
+            versionBar.append(fromControl.control, makeSpan("local-mr-version-arrow", "→"));
+
+            const toLabel = selectedTo.latest ? "Latest version" : selectedTo.label;
+            const toControl = makeControl("local-mr-push-version", toLabel);
+            versionData.pushVersions.slice(fromIndex + 1).forEach((version) => {
+              appendOption({
+                menu: toControl.menu,
+                title: version.label,
+                description: version.description,
+                selected: version.value === selectedTo.value,
+                onClick: () => navigateToVersion({
+                  mode: "push",
+                  from: selectedFrom.value,
+                  to: version.value,
+                }),
+              });
+            });
+            versionBar.append(toControl.control);
+          } else if (versionData.commits.length > 0) {
+            const firstSelected = versionData.commits.findIndex((commit) => {
+              return commit.sha === versionData.selection.from;
+            });
+            const lastSelected = versionData.commits.findIndex((commit) => {
+              return commit.sha === versionData.selection.to;
+            });
+            const actualCommits = versionData.commits.filter((commit) => !commit.virtual);
+            const hasVirtualCommit = versionData.commits.some((commit) => commit.virtual);
+            const selectedCommits = versionData.commits.slice(firstSelected, lastSelected + 1);
+            const selectedActualCount = selectedCommits.filter((commit) => !commit.virtual).length;
+            const selectedVirtual = selectedCommits.some((commit) => commit.virtual);
+            const allSelected = firstSelected === 0 && lastSelected === versionData.commits.length - 1;
+            const allActualSelected = actualCommits.length > 0
+              && firstSelected === 0
+              && lastSelected === actualCommits.length - 1;
+            let rangeLabel;
+            if (selectedVirtual && actualCommits.length === 0) {
+              rangeLabel = "Uncommitted changes";
+            } else if (allSelected && selectedVirtual) {
+              rangeLabel = "All commits + uncommitted changes";
+            } else if (allActualSelected) {
+              rangeLabel = `All commits (${actualCommits.length})`;
+            } else if (selectedVirtual && selectedActualCount === 0) {
+              rangeLabel = "Uncommitted changes";
+            } else {
+              rangeLabel = `Selected ${selectedActualCount} commit${selectedActualCount === 1 ? "" : "s"}${selectedVirtual ? " + uncommitted changes" : ""}`;
+            }
+            const rangeControl = makeControl("local-mr-commit-range", rangeLabel);
+            appendOption({
+              menu: rangeControl.menu,
+              title: hasVirtualCommit && actualCommits.length === 0
+                ? "Uncommitted changes"
+                : hasVirtualCommit ? "All commits + uncommitted changes" : "All commits",
+              description: hasVirtualCommit && actualCommits.length === 0
+                ? "Staged, unstaged, and untracked files"
+                : hasVirtualCommit
+                ? `${actualCommits.length} commits + 1 uncommitted version`
+                : `${actualCommits.length} commits`,
+              selected: allSelected,
+              onClick: () => navigateToVersion({
+                mode: "commits",
+                from: versionData.commits[0].sha,
+                to: versionData.commits.at(-1).sha,
+              }),
+            });
+            if (hasVirtualCommit && actualCommits.length > 0) {
+              appendOption({
+                menu: rangeControl.menu,
+                title: "All commits",
+                description: `${actualCommits.length} commits, excluding uncommitted changes`,
+                selected: allActualSelected,
+                onClick: () => navigateToVersion({
+                  mode: "commits",
+                  from: actualCommits[0].sha,
+                  to: actualCommits.at(-1).sha,
+                }),
+              });
+            }
+            const sectionLabel = document.createElement("div");
+            sectionLabel.className = "local-mr-commit-section-label";
+            const sectionHint = document.createElement("small");
+            sectionHint.textContent = "Tip: Shift-click to select a range";
+            sectionLabel.append(
+              makeSpan("", "Select commits"),
+              sectionHint,
+            );
+            rangeControl.menu.append(sectionLabel);
+            versionData.commits.forEach((commit, index) => {
+              const selected = !allSelected && index >= firstSelected && index <= lastSelected;
+              const { titleRow } = appendOption({
+                menu: rangeControl.menu,
+                title: commit.subject,
+                description: commit.virtual
+                  ? "Staged, unstaged, and untracked files"
+                  : `${commit.author} committed on ${commit.dateLabel} · ${commit.shortSha}`,
+                selected,
+                className: `local-mr-commit-option${commit.virtual ? " local-mr-virtual-version" : ""}`,
+                onClick: (event) => {
+                  if (event.shiftKey && firstSelected >= 0) {
+                    const rangeStart = Math.min(firstSelected, index);
+                    const rangeEnd = Math.max(firstSelected, index);
+                    return navigateToVersion({
+                      mode: "commits",
+                      from: versionData.commits[rangeStart].sha,
+                      to: versionData.commits[rangeEnd].sha,
+                    });
+                  }
+                  return navigateToVersion({ mode: "commits", from: commit.sha, to: commit.sha });
+                },
+              });
+              titleRow.append(makeSpan("local-mr-commit-check", ""));
+            });
+            versionBar.append(rangeControl.control);
+          }
+
+          heading.insertAdjacentElement("afterend", versionBar);
+          body.classList.add("local-mr-has-version-bar");
+          document.addEventListener("click", () => closeMenus(), { signal });
+          document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") closeMenus();
+          }, { signal });
+        };
+
+        buildVersionBar();
+
+        const rawHeading = heading.textContent.trim().replace(/^Local MR:\s*/, "");
+        const arrowAt = rawHeading.indexOf("→");
+        const sourceBranch = arrowAt >= 0 ? rawHeading.slice(0, arrowAt).trim() : rawHeading;
+        const targetBranch = arrowAt >= 0 ? rawHeading.slice(arrowAt + 1).trim() : "working tree";
+
+        heading.textContent = "";
+        heading.title = rawHeading;
+        heading.append(
+          makeSpan("local-mr-brand", "LOCAL MR"),
+          makeSpan("local-mr-branch", sourceBranch),
+          makeSpan("local-mr-arrow", "→"),
+          makeSpan("local-mr-branch local-mr-target", targetBranch),
+        );
+
+        const fileItems = [...sidebar.querySelectorAll(".d2h-file-list-line")];
+        const hideZeroLineCounts = (container) => {
+          container.querySelectorAll(".d2h-lines-added, .d2h-lines-deleted").forEach((stat) => {
+            stat.hidden = (Number.parseInt(stat.textContent, 10) || 0) === 0;
+          });
+          container.querySelectorAll(".d2h-file-stats").forEach((stats) => {
+            const counts = [...stats.querySelectorAll(".d2h-lines-added, .d2h-lines-deleted")];
+            if (counts.length > 0 && counts.every((stat) => stat.hidden)) stats.hidden = true;
+          });
+        };
+        hideZeroLineCounts(sidebar);
+        hideZeroLineCounts(details);
+        const totalAdded = fileItems.reduce((sum, item) => {
+          return sum + (Number.parseInt(item.querySelector(".d2h-lines-added")?.textContent, 10) || 0);
+        }, 0);
+        const totalDeleted = fileItems.reduce((sum, item) => {
+          return sum + Math.abs(Number.parseInt(item.querySelector(".d2h-lines-deleted")?.textContent, 10) || 0);
+        }, 0);
+        const summary = document.createElement("span");
+        summary.className = "local-mr-summary";
+        summary.append(makeSpan("local-mr-summary-files", `${fileItems.length} files`));
+        if (totalAdded > 0) summary.append(makeSpan("local-mr-summary-added", `+${totalAdded}`));
+        if (totalDeleted > 0) summary.append(makeSpan("local-mr-summary-deleted", `−${totalDeleted}`));
+        heading.append(summary);
+
+        const listHeader = sidebar.querySelector(".d2h-file-list-header");
+        const listTitle = sidebar.querySelector(".d2h-file-list-title");
+        const fileList = sidebar.querySelector(".d2h-file-list");
+        if (!listHeader || !listTitle || !fileList) {
+          return;
+        }
+
+        listTitle.textContent = `Changed files · ${fileItems.length}`;
+        const searchLabel = document.createElement("label");
+        searchLabel.className = "local-mr-search-label";
+        const search = document.createElement("input");
+        search.className = "local-mr-search";
+        search.type = "search";
+        search.placeholder = "Filter changed files  /";
+        search.autocomplete = "off";
+        search.setAttribute("aria-label", "Filter changed files");
+        searchLabel.append(search);
+        listHeader.append(searchLabel);
+
+        const emptyItem = document.createElement("li");
+        emptyItem.className = "local-mr-empty";
+        emptyItem.textContent = "No matching files";
+        emptyItem.hidden = true;
+        fileList.append(emptyItem);
+
+        const fileWrappers = [...details.querySelectorAll(".d2h-file-wrapper")];
+        const readStorageKey = versionData
+          ? [
+            "local-mr:read",
+            versionData.branchName,
+            versionData.targetRef,
+            versionData.selection.mode,
+            versionData.selection.from,
+            versionData.selection.to,
+          ].join(":")
+          : `local-mr:read:${document.title}`;
+        const readPaths = new Set(await readTokensPromise);
+        try {
+          const storedPaths = JSON.parse(localStorage.getItem(readStorageKey) || "[]");
+          if (Array.isArray(storedPaths)) storedPaths.forEach((filePath) => readPaths.add(filePath));
+        } catch {}
+        const saveReadPaths = () => {
+          try {
+            localStorage.setItem(readStorageKey, JSON.stringify([...readPaths]));
+          } catch {}
+        };
+        const persistReadChange = (token, tokenPrefix, read) => {
+          if (versionData?.readStateUrl) {
+            return fetch(versionData.readStateUrl, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ token, tokenPrefix, read }),
+              keepalive: true,
+            }).then((response) => {
+              if (!response.ok) throw new Error(`Could not save read state: ${response.status}`);
+            });
+          }
+          return Promise.resolve();
+        };
+        const previewPathFor = (displayPath, renamed) => {
+          if (!renamed) return displayPath;
+          const expanded = displayPath.replace(
+            /\{[^{}]*?\s*(?:→|=>)\s*([^{}]+?)\}/g,
+            "$1",
+          );
+          const renamedPath = expanded.match(/^.*?\s*(?:→|=>)\s*(.+)$/);
+          return (renamedPath?.[1] || expanded).trim();
+        };
+        const makeEmptyCell = (lineNumber) => {
+          const cell = document.createElement("td");
+          cell.className = lineNumber
+            ? "d2h-code-side-linenumber d2h-code-side-emptyplaceholder"
+            : "d2h-code-side-emptyplaceholder";
+          return cell;
+        };
+        const mergeSplitDiff = (wrapper) => {
+          const sidePanes = [...wrapper.querySelectorAll(".d2h-file-side-diff")];
+          const oldContainer = wrapper.querySelector(".d2h-files-diff");
+          if (sidePanes.length !== 2 || !oldContainer) {
+            return;
+          }
+
+          const leftRows = [...sidePanes[0].querySelectorAll("tbody > tr")];
+          const rightRows = [...sidePanes[1].querySelectorAll("tbody > tr")];
+          const table = document.createElement("table");
+          table.className = "d2h-diff-table local-mr-split-table";
+          const columns = document.createElement("colgroup");
+          ["gutter", "code", "gutter", "code"].forEach((columnType) => {
+            const column = document.createElement("col");
+            column.className = `local-mr-${columnType}-column`;
+            columns.append(column);
+          });
+          const tableBody = document.createElement("tbody");
+          const rowCount = Math.max(leftRows.length, rightRows.length);
+
+          for (let index = 0; index < rowCount; index += 1) {
+            const row = document.createElement("tr");
+            const leftCells = leftRows[index]
+              ? [...leftRows[index].children]
+              : [makeEmptyCell(true), makeEmptyCell(false)];
+            const rightCells = rightRows[index]
+              ? [...rightRows[index].children]
+              : [makeEmptyCell(true), makeEmptyCell(false)];
+            row.className = [leftRows[index]?.className, rightRows[index]?.className]
+              .filter(Boolean)
+              .join(" ");
+            const isHunkHeader = leftCells[1]?.classList.contains("d2h-info")
+              && rightCells[1]?.classList.contains("d2h-info");
+            if (isHunkHeader) {
+              leftCells[1].colSpan = 3;
+              row.append(leftCells[0], leftCells[1]);
+            } else {
+              row.append(...leftCells, ...rightCells);
+            }
+            tableBody.append(row);
+          }
+
+          table.append(columns, tableBody);
+          const merged = document.createElement("div");
+          merged.className = "local-mr-split-diff";
+          merged.append(table);
+          oldContainer.replaceWith(merged);
+        };
+        const parseHunkRow = (row) => {
+          const hunkContainer = row.querySelector(".d2h-code-side-line, .d2h-code-line");
+          const hunkText = hunkContainer?.textContent || row.textContent;
+          const match = hunkText.match(
+            /@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/,
+          );
+          if (!match) return null;
+          return {
+            row,
+            oldStart: Number.parseInt(match[1], 10),
+            oldLines: match[2] === undefined ? 1 : Number.parseInt(match[2], 10),
+            newStart: Number.parseInt(match[3], 10),
+            newLines: match[4] === undefined ? 1 : Number.parseInt(match[4], 10),
+            hunkContainer,
+            suffix: hunkText.slice((match.index || 0) + match[0].length),
+          };
+        };
+        const updateHunkLabel = (hunk) => {
+          if (!hunk?.hunkContainer?.isConnected) return;
+          const label = `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@${hunk.suffix}`;
+          const walker = document.createTreeWalker(hunk.hunkContainer, NodeFilter.SHOW_TEXT);
+          let textNode = walker.nextNode();
+          while (textNode && !textNode.textContent.includes("@@")) {
+            textNode = walker.nextNode();
+          }
+          if (textNode) textNode.textContent = label;
+        };
+        const makeContextCodeCell = (lineText, sideBySide) => {
+          const cell = document.createElement("td");
+          cell.className = "d2h-cntx";
+          const line = document.createElement("div");
+          line.className = sideBySide ? "d2h-code-side-line" : "d2h-code-line";
+          const prefix = makeSpan("d2h-code-line-prefix", "\u00a0");
+          const content = makeSpan("d2h-code-line-ctn", lineText);
+          line.append(prefix, content);
+          cell.append(line);
+          return cell;
+        };
+        const makeExpandedContextRow = ({ table, oldLine, newLine, lineText }) => {
+          const row = document.createElement("tr");
+          row.className = "local-mr-expanded-context";
+          row.dataset.oldLine = String(oldLine);
+          row.dataset.newLine = String(newLine);
+          const sideBySide = table.classList.contains("local-mr-split-table");
+          if (sideBySide) {
+            const oldNumber = document.createElement("td");
+            oldNumber.className = "d2h-code-side-linenumber d2h-cntx";
+            oldNumber.textContent = String(oldLine);
+            const newNumber = document.createElement("td");
+            newNumber.className = "d2h-code-side-linenumber d2h-cntx";
+            newNumber.textContent = String(newLine);
+            row.append(
+              oldNumber,
+              makeContextCodeCell(lineText, true),
+              newNumber,
+              makeContextCodeCell(lineText, true),
+            );
+          } else {
+            const numbers = document.createElement("td");
+            numbers.className = "d2h-code-linenumber d2h-cntx";
+            numbers.append(
+              makeSpan("line-num1", String(oldLine)),
+              makeSpan("line-num2", String(newLine)),
+            );
+            row.append(numbers, makeContextCodeCell(lineText, false));
+          }
+          return row;
+        };
+        const contextTitle = (direction) => ({
+          all: "Expand this section",
+          down: "Expand 20 lines downward",
+          up: "Expand 20 lines upward",
+        })[direction];
+        const contextGlyph = (direction) => ({ all: "↕", down: "↓", up: "↑" })[direction];
+        const makeContextButton = (direction, onClick) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "local-mr-context-button";
+          button.dataset.direction = direction;
+          button.title = contextTitle(direction);
+          button.setAttribute("aria-label", contextTitle(direction));
+          button.textContent = contextGlyph(direction);
+          button.addEventListener("click", onClick);
+          return button;
+        };
+        const fetchContextLines = async (entry, start, end) => {
+          if (!versionData?.contextUrl) throw new Error("The diff context URL is missing");
+          const contextUrl = new URL(versionData.contextUrl, document.baseURI);
+          contextUrl.searchParams.set("mode", versionData.selection.mode);
+          contextUrl.searchParams.set("from", versionData.selection.from);
+          contextUrl.searchParams.set("to", versionData.selection.to);
+          contextUrl.searchParams.set("patch", versionData.patchId);
+          contextUrl.searchParams.set("file", entry.filePatchId);
+          contextUrl.searchParams.set("start", String(start));
+          contextUrl.searchParams.set("end", String(end));
+          const response = await fetch(contextUrl, {
+            headers: { Accept: "application/json" },
+            signal,
+          });
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.error || `Could not expand context: ${response.status}`);
+          if (
+            !Array.isArray(payload.lines)
+            || !Number.isSafeInteger(payload.start)
+            || !Number.isSafeInteger(payload.end)
+          ) {
+            throw new Error("The diff context response is invalid");
+          }
+          return payload;
+        };
+        const prepareContextExpansion = (entry, wrapper) => {
+          if (!wrapper || wrapper.dataset.localMrContextPrepared === "true") return;
+          wrapper.dataset.localMrContextPrepared = "true";
+          if (
+            !versionData?.contextUrl
+            || !entry?.filePatchId
+            || entry.status === "added"
+            || entry.status === "deleted"
+          ) {
+            return;
+          }
+          const table = wrapper.querySelector(
+            ".local-mr-split-table, .d2h-file-diff .d2h-diff-table",
+          );
+          if (!table) return;
+          const hunks = [...table.querySelectorAll("tbody > tr")]
+            .map(parseHunkRow)
+            .filter(Boolean);
+          if (hunks.length === 0) return;
+
+          const clearGapControls = (gap) => {
+            gap.gutter.replaceChildren();
+            gap.hunkContainer
+              ?.querySelector(":scope > .local-mr-context-inline")
+              ?.remove();
+          };
+          const finishGap = (gap) => {
+            clearGapControls(gap);
+            gap.row.classList.remove("local-mr-context-decoration");
+          };
+          const renderGapControls = (gap) => {
+            clearGapControls(gap);
+            if (gap.start > gap.end) {
+              finishGap(gap);
+              return;
+            }
+            gap.row.classList.add("local-mr-context-decoration");
+            gap.hunkContainer?.classList.add("local-mr-context-hunk");
+            const controls = document.createElement("div");
+            controls.className = "local-mr-context-controls";
+            const remaining = gap.end - gap.start + 1;
+            const expand = (direction) => async () => {
+              if (gap.loading) return;
+              gap.loading = true;
+              gap.row.querySelectorAll(".local-mr-context-button")
+                .forEach((button) => { button.disabled = true; });
+              let start = gap.start;
+              let end = gap.end;
+              if (direction === "down") end = Math.min(start + 19, gap.end);
+              if (direction === "up") start = Math.max(gap.start, end - 19);
+              try {
+                const payload = await fetchContextLines(entry, start, end);
+                const rows = payload.lines.map((lineText, index) => {
+                  const oldLine = payload.start + index;
+                  return makeExpandedContextRow({
+                    table,
+                    oldLine,
+                    newLine: oldLine + gap.offset,
+                    lineText,
+                  });
+                });
+                if (rows.length === 0) throw new Error("The selected section has no code to expand");
+                if (direction === "down") {
+                  gap.row.before(...rows);
+                  gap.start = payload.end + 1;
+                  gap.previousHunk.oldLines += rows.length;
+                  gap.previousHunk.newLines += rows.length;
+                  updateHunkLabel(gap.previousHunk);
+                } else {
+                  gap.row.after(...rows);
+                  gap.end = payload.start - 1;
+                  gap.hunk.oldStart = payload.start;
+                  gap.hunk.newStart = payload.start + gap.offset;
+                  gap.hunk.oldLines += rows.length;
+                  gap.hunk.newLines += rows.length;
+                  updateHunkLabel(gap.hunk);
+                }
+                gap.error = "";
+              } catch (error) {
+                if (error.name !== "AbortError") {
+                  gap.error = error.message;
+                  console.error(error);
+                }
+              } finally {
+                gap.loading = false;
+                if (gap.row.isConnected) renderGapControls(gap);
+              }
+            };
+            if (remaining <= 20) {
+              controls.append(makeContextButton("all", expand("all")));
+            } else {
+              if (gap.previousHunk) controls.append(makeContextButton("down", expand("down")));
+              controls.append(makeContextButton("up", expand("up")));
+              controls.classList.toggle("local-mr-context-multiple", controls.childElementCount > 1);
+              if (gap.previousHunk && gap.hunkContainer) {
+                const inline = document.createElement("span");
+                inline.className = "local-mr-context-inline";
+                inline.append(makeContextButton("all", expand("all")));
+                gap.hunkContainer.prepend(inline);
+              }
+            }
+            if (gap.error) {
+              controls.querySelectorAll("button").forEach((button) => {
+                button.title = `${contextTitle(button.dataset.direction)}：${gap.error}`;
+              });
+            }
+            gap.gutter.append(controls);
+          };
+
+          hunks.forEach((hunk, index) => {
+            const previousHunk = hunks[index - 1] || null;
+            const start = previousHunk
+              ? previousHunk.oldStart + previousHunk.oldLines
+              : 1;
+            const end = hunk.oldStart - 1;
+            if (start > end || hunk.oldStart <= 1) return;
+            const cells = [...hunk.row.cells];
+            const gutter = cells[0];
+            const content = cells.at(-1);
+            const hunkContainer = hunk.hunkContainer;
+            if (!gutter || !content || !hunkContainer) return;
+            renderGapControls({
+              row: hunk.row,
+              gutter,
+              hunkContainer,
+              hunk,
+              previousHunk,
+              start,
+              end,
+              offset: hunk.newStart - hunk.oldStart,
+              loading: false,
+              error: "",
+            });
+          });
+
+          const lastHunk = hunks.at(-1);
+          let nextLine = lastHunk.oldStart + lastHunk.oldLines;
+          if (nextLine < 1) return;
+          const footer = document.createElement("tr");
+          footer.className = "local-mr-context-footer";
+          const sideBySide = table.classList.contains("local-mr-split-table");
+          const gutter = document.createElement("td");
+          gutter.className = sideBySide
+            ? "d2h-code-side-linenumber d2h-info"
+            : "d2h-code-linenumber d2h-info";
+          const content = document.createElement("td");
+          content.className = "d2h-info";
+          if (sideBySide) content.colSpan = 3;
+          const controls = document.createElement("div");
+          controls.className = "local-mr-context-controls";
+          const offset = (lastHunk.newStart + lastHunk.newLines) - nextLine;
+          let loading = false;
+          let prefetchedTail = null;
+          let tailPrefetch = fetchContextLines(entry, nextLine, nextLine + 19)
+            .then((payload) => {
+              prefetchedTail = payload;
+              if (payload.lines.length > 0 && !footer.isConnected) {
+                table.tBodies[0].append(footer);
+              }
+              return payload;
+            })
+            .catch((error) => {
+              if (error.name !== "AbortError" && !footer.isConnected) {
+                table.tBodies[0].append(footer);
+              }
+              return null;
+            });
+          const expandTail = async () => {
+            if (loading) return;
+            loading = true;
+            const button = controls.querySelector("button");
+            if (button) button.disabled = true;
+            try {
+              if (tailPrefetch) await tailPrefetch;
+              const payload = prefetchedTail
+                || await fetchContextLines(entry, nextLine, nextLine + 19);
+              prefetchedTail = null;
+              tailPrefetch = null;
+              const rows = payload.lines.map((lineText, index) => {
+                const oldLine = payload.start + index;
+                return makeExpandedContextRow({
+                  table,
+                  oldLine,
+                  newLine: oldLine + offset,
+                  lineText,
+                });
+              });
+              footer.before(...rows);
+              nextLine = payload.end + 1;
+              lastHunk.oldLines += rows.length;
+              lastHunk.newLines += rows.length;
+              updateHunkLabel(lastHunk);
+              if (rows.length === 0 || !payload.hasMore) footer.remove();
+            } catch (error) {
+              if (error.name !== "AbortError") {
+                console.error(error);
+                if (button) button.title = `${contextTitle("down")}：${error.message}`;
+              }
+            } finally {
+              loading = false;
+              if (button?.isConnected) button.disabled = false;
+            }
+          };
+          controls.append(makeContextButton("down", expandTail));
+          gutter.append(controls);
+          footer.append(gutter, content);
+        };
+        const wrappersById = new Map(fileWrappers.map((wrapper) => [wrapper.id, wrapper]));
+        fileWrappers.forEach((wrapper) => {
+          wrapper.hidden = true;
+        });
+
+        const linksById = new Map();
+        const fileEntries = [];
+        fileItems.forEach((item, fileIndex) => {
+          const link = item.querySelector(".d2h-file-name");
+          if (!link) {
+            return;
+          }
+
+          const fileData = versionData?.files?.[fileIndex];
+          const fullPath = fileData?.displayPath || link.textContent.trim();
+          const slashAt = fullPath.lastIndexOf("/");
+          const basename = slashAt >= 0 ? fullPath.slice(slashAt + 1) : fullPath;
+          link.dataset.path = fullPath.toLocaleLowerCase();
+          link.title = fullPath;
+          link.textContent = "";
+          link.append(makeSpan("local-mr-basename", basename));
+
+          const targetId = link.hash.slice(1);
+          const previewPath = fileData?.newPath
+            || previewPathFor(fullPath, Boolean(item.querySelector(".d2h-moved")));
+          const deleted = fileData?.status === "deleted" || Boolean(item.querySelector(".d2h-deleted"));
+          const status = fileData?.status || (deleted ? "deleted" : "modified");
+          const filePatchId = fileData?.patchId || versionData?.filePatchIds?.[previewPath]
+            || `${versionData?.patchId || "no-patch-id"}:${fullPath}`;
+          const readStatus = document.createElement("button");
+          readStatus.type = "button";
+          readStatus.className = "local-mr-file-read-status";
+          readStatus.id = `local-mr-file-read-status-${fileIndex}`;
+          readStatus.setAttribute("aria-label", "Toggle file read state");
+          const readStatusText = makeSpan("local-mr-visually-hidden local-mr-read-state-text", "");
+          readStatusText.id = `local-mr-file-read-state-${fileIndex}`;
+          readStatusText.setAttribute("aria-live", "polite");
+          readStatusText.setAttribute("aria-atomic", "true");
+          readStatus.append(readStatusText);
+          link.setAttribute("aria-describedby", readStatusText.id);
+          link.closest(".d2h-file-name-wrapper")?.append(readStatus);
+          const entry = {
+            item,
+            link,
+            fullPath,
+            previewPath,
+            deleted,
+            status,
+            filePatchId,
+            targetId,
+            readToken: `${fullPath}\0${filePatchId}`,
+            readStatus,
+            readStatusText,
+            readStateSave: Promise.resolve(),
+          };
+          fileEntries.push(entry);
+          linksById.set(targetId, entry);
+          item.addEventListener("click", (event) => {
+            if (!event.target.closest("a, button")) {
+              link.click();
+            }
+          });
+        });
+
+        let filteredFileCount = fileItems.length;
+        let readCount = 0;
+        const updateReadSummary = () => {
+          const filesLabel = filteredFileCount === fileItems.length
+            ? `${fileItems.length}`
+            : `${filteredFileCount}/${fileItems.length}`;
+          listTitle.textContent = `Changed files · ${filesLabel} · ${readCount} read`;
+        };
+        const updateReadEntry = (entry) => {
+          const isRead = readPaths.has(entry.readToken);
+          entry.item.classList.toggle("local-mr-read", isRead);
+          entry.item.classList.toggle("local-mr-unread", !isRead);
+          entry.readStatusText.textContent = isRead ? "Read" : "Unread";
+          entry.readStatus.setAttribute("aria-pressed", String(isRead));
+          entry.readStatus.title = isRead ? "Mark as unread" : "Mark as read";
+        };
+        const setRead = (entry, isRead) => {
+          const wasRead = readPaths.has(entry.readToken);
+          const tokenPrefix = `${entry.fullPath}\0`;
+          [...readPaths]
+            .filter((token) => token.startsWith(tokenPrefix))
+            .forEach((token) => readPaths.delete(token));
+          if (isRead) readPaths.add(entry.readToken);
+          if (wasRead !== isRead) readCount += isRead ? 1 : -1;
+          saveReadPaths();
+          entry.readStateSave = entry.readStateSave
+            .then(() => persistReadChange(entry.readToken, tokenPrefix, isRead))
+            .catch(() => {});
+          updateReadEntry(entry);
+          updateReadSummary();
+        };
+
+        const prepareWrapper = (entry, wrapper) => {
+          if (!wrapper || wrapper.dataset.localMrPrepared === "true") return;
+          wrapper.dataset.localMrPrepared = "true";
+          const { fullPath, previewPath, deleted } = entry;
+          const header = wrapper?.querySelector(".d2h-file-header");
+          const headerName = header?.querySelector(".d2h-file-name");
+          if (!headerName) {
+            return;
+          }
+          const slashAt = fullPath.lastIndexOf("/");
+          const basename = slashAt >= 0 ? fullPath.slice(slashAt + 1) : fullPath;
+          const directory = slashAt >= 0 ? fullPath.slice(0, slashAt + 1) : "";
+          headerName.textContent = "";
+          headerName.title = fullPath;
+          headerName.append(makeSpan("local-mr-file-basename", basename));
+          if (directory) {
+            headerName.append(makeSpan("local-mr-file-directory", directory));
+          }
+          const actions = document.createElement("div");
+          actions.className = "local-mr-file-actions";
+          if (
+            !deleted
+            && /\.(?:md|markdown|mdown|mkd)$/i.test(previewPath)
+            && versionData?.previewUrl
+          ) {
+            const currentDiff = () => wrapper.querySelector(
+              ".local-mr-split-diff, .d2h-file-diff, .d2h-files-diff",
+            );
+            const preview = document.createElement("section");
+            preview.className = "local-mr-markdown-preview";
+            preview.hidden = true;
+            wrapper.append(preview);
+            const mode = document.createElement("div");
+            mode.className = "local-mr-file-mode";
+            const diffToggle = document.createElement("button");
+            diffToggle.type = "button";
+            diffToggle.className = "local-mr-file-action local-mr-diff-toggle local-mr-selected";
+            diffToggle.textContent = "Diff";
+            const previewToggle = document.createElement("button");
+            previewToggle.type = "button";
+            previewToggle.className = "local-mr-file-action local-mr-preview-toggle";
+            previewToggle.textContent = "Preview";
+            let previewLoaded = false;
+            let previewLoading = false;
+            diffToggle.addEventListener("click", () => {
+              const diff = currentDiff();
+              if (diff) diff.hidden = false;
+              preview.hidden = true;
+              diffToggle.classList.add("local-mr-selected");
+              previewToggle.classList.remove("local-mr-selected");
+            });
+            previewToggle.addEventListener("click", async () => {
+              const diff = currentDiff();
+              if (diff) diff.hidden = true;
+              preview.hidden = false;
+              diffToggle.classList.remove("local-mr-selected");
+              previewToggle.classList.add("local-mr-selected");
+              if (!previewLoaded && !previewLoading) {
+                previewLoading = true;
+                previewLoaded = await renderMarkdown(previewPath, preview);
+                previewLoading = false;
+              }
+            });
+            mode.append(diffToggle, previewToggle);
+            actions.append(mode);
+          }
+          if (actions.childElementCount > 0) header.append(actions);
+        };
+
+        fileEntries.forEach((entry) => {
+          entry.readStatus.addEventListener("click", (event) => {
+            event.stopPropagation();
+            setRead(entry, !readPaths.has(entry.readToken));
+          });
+          updateReadEntry(entry);
+          if (readPaths.has(entry.readToken)) readCount += 1;
+          prepareWrapper(entry, wrappersById.get(entry.targetId));
+        });
+        updateReadSummary();
+
+        const makeTreeNode = () => ({ directories: new Map(), files: [] });
+        const treeRoot = makeTreeNode();
+        fileEntries.forEach((entry) => {
+          const parts = entry.fullPath.split("/");
+          const filename = parts.pop();
+          let treeNode = treeRoot;
+          parts.forEach((directory) => {
+            if (!treeNode.directories.has(directory)) {
+              treeNode.directories.set(directory, makeTreeNode());
+            }
+            treeNode = treeNode.directories.get(directory);
+          });
+          treeNode.files.push({ ...entry, filename });
+        });
+
+        const directoryElements = [];
+        const renderTreeNode = (treeNode, container, ancestors = []) => {
+          treeNode.directories.forEach((childNode, directoryName) => {
+            const directoryItem = document.createElement("li");
+            directoryItem.className = "local-mr-tree-directory";
+            const directoryButton = document.createElement("button");
+            directoryButton.type = "button";
+            directoryButton.className = "local-mr-tree-directory-row";
+            directoryButton.setAttribute("aria-expanded", "true");
+            directoryButton.title = `${directoryName}/`;
+            directoryButton.append(
+              makeSpan("local-mr-tree-chevron", "›"),
+              makeSpan("local-mr-tree-folder-icon", ""),
+              makeSpan("local-mr-tree-directory-name", `${directoryName}/`),
+            );
+            const children = document.createElement("ul");
+            children.className = "local-mr-tree-children";
+            const directoryEntry = {
+              item: directoryItem,
+              button: directoryButton,
+              children,
+              matchCount: 0,
+            };
+            renderTreeNode(childNode, children, [...ancestors, directoryEntry]);
+            directoryButton.addEventListener("click", () => {
+              const collapsed = directoryItem.classList.toggle("local-mr-collapsed");
+              children.hidden = collapsed;
+              directoryButton.setAttribute("aria-expanded", String(!collapsed));
+            });
+            directoryItem.append(directoryButton, children);
+            directoryElements.push(directoryEntry);
+            container.append(directoryItem);
+          });
+          treeNode.files.forEach(({ item, targetId }) => {
+            const entry = linksById.get(targetId);
+            if (entry) entry.directories = ancestors;
+            container.append(item);
+          });
+        };
+
+        fileList.textContent = "";
+        fileList.classList.add("local-mr-tree");
+        renderTreeNode(treeRoot, fileList);
+        fileList.append(emptyItem);
+
+        let activeId = "";
+        let visibleWrapper = null;
+        let fileNavigationSequence = 0;
+        const setActive = (id) => {
+          if (!id || id === activeId) {
+            return;
+          }
+          linksById.get(activeId)?.item.classList.remove("local-mr-active");
+          const current = linksById.get(id);
+          current?.item.classList.add("local-mr-active");
+          if (current && !current.item.hidden) {
+            let directory = current.item.parentElement?.closest(".local-mr-tree-directory");
+            while (directory) {
+              directory.classList.remove("local-mr-collapsed");
+              const children = directory.querySelector(":scope > .local-mr-tree-children");
+              const button = directory.querySelector(":scope > .local-mr-tree-directory-row");
+              if (children) children.hidden = false;
+              button?.setAttribute("aria-expanded", "true");
+              directory = directory.parentElement?.closest(".local-mr-tree-directory");
+            }
+            current.item.scrollIntoView({ block: "nearest" });
+          }
+          activeId = id;
+        };
+
+        const loadWrapper = async (id) => {
+          const loaded = wrappersById.get(id);
+          if (loaded) return loaded;
+          if (!versionData?.fragmentUrl) throw new Error("The file diff URL is missing");
+          const fragmentUrl = new URL(versionData.fragmentUrl, document.baseURI);
+          fragmentUrl.searchParams.set("mode", versionData.selection.mode);
+          fragmentUrl.searchParams.set("from", versionData.selection.from);
+          fragmentUrl.searchParams.set("to", versionData.selection.to);
+          fragmentUrl.searchParams.set("patch", versionData.patchId);
+          fragmentUrl.searchParams.set("id", id);
+          const response = await fetch(fragmentUrl, {
+            headers: { Accept: "text/html" },
+            signal,
+          });
+          if (!response.ok) throw new Error(`Could not load file diff: ${response.status}`);
+          const template = document.createElement("template");
+          template.innerHTML = (await response.text()).trim();
+          const wrapper = template.content.firstElementChild;
+          if (!wrapper?.classList.contains("d2h-file-wrapper") || wrapper.id !== id) {
+            throw new Error("The file diff response is invalid");
+          }
+          wrapper.hidden = true;
+          details.append(wrapper);
+          wrappersById.set(id, wrapper);
+          hideZeroLineCounts(wrapper);
+          prepareWrapper(linksById.get(id), wrapper);
+          return wrapper;
+        };
+
+        const goToFile = async (id) => {
+          if (!linksById.has(id)) return;
+          const navigationSequence = ++fileNavigationSequence;
+          details.classList.add("local-mr-fragment-loading");
+          let target;
+          try {
+            target = await loadWrapper(id);
+          } catch (error) {
+            if (error.name !== "AbortError") console.error(error);
+            return;
+          } finally {
+            if (navigationSequence === fileNavigationSequence) {
+              details.classList.remove("local-mr-fragment-loading");
+            }
+          }
+          if (navigationSequence !== fileNavigationSequence) return;
+          if (visibleWrapper && visibleWrapper !== target) visibleWrapper.hidden = true;
+          mergeSplitDiff(target);
+          prepareContextExpansion(linksById.get(id), target);
+          target.hidden = false;
+          visibleWrapper = target;
+          details.scrollTop = 0;
+          setActive(id);
+          const entry = linksById.get(id);
+          if (entry && !readPaths.has(entry.readToken)) setRead(entry, true);
+          history.replaceState(null, "", `#${id}`);
+        };
+
+        linksById.forEach(({ link }, id) => {
+          link.addEventListener("click", (event) => {
+            event.preventDefault();
+            goToFile(id);
+          });
+        });
+
+        let searchFrame = 0;
+        const applySearch = () => {
+          searchFrame = 0;
+          const query = search.value.trim().toLocaleLowerCase();
+          let visible = 0;
+          directoryElements.forEach((directory) => {
+            directory.matchCount = 0;
+          });
+          linksById.forEach((entry) => {
+            const { item, link } = entry;
+            const matches = !query || link.dataset.path.includes(query);
+            item.hidden = !matches;
+            visible += matches ? 1 : 0;
+            if (matches) entry.directories.forEach((directory) => {
+              directory.matchCount += 1;
+            });
+          });
+          [...directoryElements].reverse().forEach((directory) => {
+            const { item, button, children } = directory;
+            const hasMatch = directory.matchCount > 0;
+            item.hidden = Boolean(query) && !hasMatch;
+            children.hidden = query && hasMatch
+              ? false
+              : item.classList.contains("local-mr-collapsed");
+            button.setAttribute("aria-expanded", String(!children.hidden));
+          });
+          emptyItem.hidden = visible !== 0;
+          filteredFileCount = visible;
+          updateReadSummary();
+        };
+        search.addEventListener("input", () => {
+          if (searchFrame) cancelAnimationFrame(searchFrame);
+          searchFrame = requestAnimationFrame(applySearch);
+        });
+
+        document.addEventListener("keydown", (event) => {
+          const typing = event.target.matches("input, textarea, select, [contenteditable='true']");
+          if (event.key === "/" && !typing) {
+            event.preventDefault();
+            search.focus();
+          } else if (event.key === "Escape" && document.activeElement === search) {
+            search.value = "";
+            search.dispatchEvent(new Event("input"));
+            search.blur();
+          }
+        }, { signal });
+
+        const initialId = location.hash.slice(1);
+        const firstId = fileWrappers[0]?.id;
+        void goToFile(linksById.has(initialId) ? initialId : firstId);
+        body.classList.remove("local-mr-version-loading");
+        document.documentElement.classList.add("local-mr-ready");
+        };
+
+        document.addEventListener("DOMContentLoaded", initializeReview, { once: true });
+      })();
+    </script>

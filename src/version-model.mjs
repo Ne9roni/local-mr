@@ -1,0 +1,493 @@
+import { execFile } from "node:child_process";
+import crypto from "node:crypto";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
+const emptyTreeSha = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+const maximumPreviewBytes = 2 * 1024 * 1024;
+
+const hashParts = (...parts) => {
+    const hash = crypto.createHash("sha256");
+    parts.forEach((part) => hash.update(String(part)).update("\0"));
+    return hash.digest("hex");
+};
+
+const runGit = async (repoRoot, args, options = {}) => execFileAsync("git", args, {
+    cwd: repoRoot,
+    encoding: "utf8",
+    maxBuffer: 256 * 1024 * 1024,
+    timeout: 300_000,
+    killSignal: "SIGTERM",
+    env: { ...process.env, ...options.env },
+});
+
+const gitRaw = async (repoRoot, args, options = {}) => (
+    await runGit(repoRoot, args, options)
+).stdout;
+
+const git = async (repoRoot, args, options = {}) => (
+    await gitRaw(repoRoot, args, options)
+).trimEnd();
+
+const tryGit = async (repoRoot, args) => {
+    try {
+        return await git(repoRoot, args);
+    } catch {
+        return "";
+    }
+};
+
+const parseRecords = (text, fields) => text
+    .split("\u001e")
+    .map((record) => record.replace(/^\n+|\n+$/g, ""))
+    .filter(Boolean)
+    .map((record) => {
+        const values = record.split("\0");
+        return Object.fromEntries(fields.map((field, index) => [field, values[index] || ""]));
+    });
+
+const formatDate = (value) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    const parts = new Intl.DateTimeFormat("zh-CN", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    }).formatToParts(date);
+    const part = (type) => parts.find((entry) => entry.type === type)?.value || "";
+    return `${part("year")}.${part("month")}.${part("day")} ${part("hour")}:${part("minute")}`;
+};
+
+const isAncestor = async (repoRoot, ancestor, descendant) => {
+    try {
+        await git(repoRoot, ["merge-base", "--is-ancestor", ancestor, descendant]);
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+const commitCount = async (repoRoot, fromSha, toSha) => {
+    if (fromSha === toSha) return 0;
+    const value = await tryGit(repoRoot, ["rev-list", "--count", `${fromSha}..${toSha}`]);
+    return Number.parseInt(value, 10) || 0;
+};
+
+const statusPathRecords = (status) => {
+    const records = status.split("\0").filter(Boolean);
+    const paths = [];
+    for (let index = 0; index < records.length; index += 1) {
+        const record = records[index];
+        if (record.startsWith("? ")) {
+            paths.push(record.slice(2));
+        } else if (record.startsWith("1 ")) {
+            const filePath = record.match(/^1 (?:\S+ ){7}([\s\S]*)$/)?.[1];
+            if (filePath) paths.push(filePath);
+        } else if (record.startsWith("2 ")) {
+            const filePath = record.match(/^2 (?:\S+ ){8}([\s\S]*)$/)?.[1];
+            if (filePath) paths.push(filePath);
+            index += 1;
+        } else if (record.startsWith("u ")) {
+            const filePath = record.match(/^u (?:\S+ ){9}([\s\S]*)$/)?.[1];
+            if (filePath) paths.push(filePath);
+        }
+    }
+    return paths;
+};
+
+const fileStateFingerprint = async (repoRoot, status) => {
+    const hash = crypto.createHash("sha256").update(status);
+    const filePaths = [...new Set(statusPathRecords(status))].sort();
+    const batchSize = 128;
+    for (let offset = 0; offset < filePaths.length; offset += batchSize) {
+        const batch = filePaths.slice(offset, offset + batchSize);
+        const states = await Promise.all(batch.map(async (filePath) => {
+            try {
+                const metadata = await fs.lstat(path.join(repoRoot, filePath), { bigint: true });
+                return [
+                    filePath,
+                    metadata.mode,
+                    metadata.size,
+                    metadata.mtimeNs,
+                    metadata.ctimeNs,
+                ].join("\0");
+            } catch (error) {
+                if (error.code === "ENOENT") return `${filePath}\0deleted`;
+                throw error;
+            }
+        }));
+        states.forEach((state) => hash.update(state).update("\0"));
+    }
+    return hash.digest("hex");
+};
+
+export const inspectRepositoryState = async ({ repoRoot, targetRef }) => {
+    const status = await gitRaw(repoRoot, [
+        "status",
+        "--porcelain=v2",
+        "--branch",
+        "-z",
+        "--untracked-files=all",
+    ], { env: { GIT_OPTIONAL_LOCKS: "0" } });
+    const records = status.split("\0").filter(Boolean);
+    const headerValue = (name) => records
+        .find((record) => record.startsWith(`# ${name} `))
+        ?.slice(name.length + 3) || "";
+    const headSha = headerValue("branch.oid");
+    const branchHead = headerValue("branch.head");
+    const upstream = headerValue("branch.upstream");
+    const [targetSha, upstreamSha, worktreeKey] = await Promise.all([
+        git(repoRoot, ["rev-parse", `${targetRef}^{commit}`]),
+        upstream ? tryGit(repoRoot, ["rev-parse", `${upstream}^{commit}`]) : "",
+        fileStateFingerprint(repoRoot, status),
+    ]);
+    const dirty = records.some((record) => !record.startsWith("# "));
+    const branchName = branchHead && branchHead !== "(detached)"
+        ? branchHead
+        : headSha.slice(0, 7);
+    return {
+        branchName,
+        headSha,
+        targetSha,
+        upstream,
+        upstreamSha,
+        dirty,
+        modelKey: hashParts(branchName, headSha, targetSha, upstream, upstreamSha, dirty),
+        worktreeKey,
+    };
+};
+
+const collectCommits = async (repoRoot, baseSha) => {
+    const output = await git(repoRoot, [
+        "log",
+        "--reverse",
+        "--format=%H%x00%P%x00%aI%x00%an%x00%s%x1e",
+        `${baseSha}..HEAD`,
+    ]);
+    return parseRecords(output, ["sha", "parents", "authoredAt", "author", "subject"])
+        .map((commit) => ({
+            ...commit,
+            shortSha: commit.sha.slice(0, 8),
+            parentSha: commit.parents.split(" ").filter(Boolean)[0] || emptyTreeSha,
+            dateLabel: formatDate(commit.authoredAt),
+        }));
+};
+
+const reflogDate = (selector) => selector.match(/@\{(.+)\}$/)?.[1] || "";
+
+const collectPushRecords = async ({ repoRoot, upstream, baseSha, commits }) => {
+    if (!upstream) return [];
+    const output = await tryGit(repoRoot, [
+        "reflog",
+        "show",
+        "--date=iso-strict",
+        "--format=%H%x00%gD%x00%gs%x1e",
+        upstream,
+    ]);
+    const seen = new Set();
+    const candidates = [];
+    for (const record of parseRecords(output, ["sha", "selector", "message"]).reverse()) {
+        if (record.message.trim().toLowerCase() !== "update by push") continue;
+        if (!record.sha || seen.has(record.sha) || record.sha === baseSha) continue;
+        seen.add(record.sha);
+        candidates.push(record);
+    }
+    const ancestry = await Promise.all(candidates.map((record) => (
+        isAncestor(repoRoot, baseSha, record.sha)
+    )));
+    const commitsBySha = new Map(commits.map((commit) => [commit.sha, commit]));
+    return candidates.flatMap((record, index) => {
+        if (!ancestry[index]) return [];
+        const matchingCommit = commitsBySha.get(record.sha);
+        return [{
+            sha: record.sha,
+            pushedAt: reflogDate(record.selector) || matchingCommit?.authoredAt || "",
+            message: record.message,
+        }];
+    });
+};
+
+export const buildVersionModel = async ({ repoRoot, targetRef, repositoryState }) => {
+    const state = repositoryState || await inspectRepositoryState({ repoRoot, targetRef });
+    const { branchName, headSha, upstream, dirty } = state;
+    const baseSha = await git(repoRoot, ["merge-base", headSha, state.targetSha]);
+    const committedChanges = await collectCommits(repoRoot, baseSha);
+    const pushRecords = await collectPushRecords({
+        repoRoot,
+        upstream,
+        baseSha,
+        commits: committedChanges,
+    });
+
+    const lastPushSha = pushRecords.at(-1)?.sha || baseSha;
+    const versionSeeds = pushRecords.map((record, index) => ({
+        kind: "push",
+        value: `push:${record.sha}`,
+        sha: record.sha,
+        fromSha: index === 0 ? baseSha : pushRecords[index - 1].sha,
+        date: record.pushedAt,
+        dateLabel: formatDate(record.pushedAt),
+    }));
+    if (headSha !== lastPushSha) {
+        versionSeeds.push({
+            kind: "local",
+            value: `local:${headSha}`,
+            sha: headSha,
+            fromSha: lastPushSha,
+            date: new Date().toISOString(),
+            dateLabel: "Current local HEAD",
+        });
+    }
+    const commitCounts = await Promise.all(versionSeeds.map((version) => (
+        commitCount(repoRoot, version.fromSha, version.sha)
+    )));
+    const committedVersions = versionSeeds.map((version, index) => {
+        const { fromSha, ...publicVersion } = version;
+        return {
+            ...publicVersion,
+            commitCount: commitCounts[index],
+        };
+    });
+
+    committedVersions.forEach((version, index) => {
+        const latest = index === committedVersions.length - 1;
+        version.latest = latest;
+        version.label = `Version ${index + 1}${latest ? " (latest)" : ""}`;
+        const commitsText = `${version.commitCount} commit${version.commitCount === 1 ? "" : "s"}`;
+        version.description = `${commitsText}${version.dateLabel ? `, ${version.dateLabel}` : ""}`;
+    });
+
+    const worktreeVersion = dirty ? {
+        kind: "worktree",
+        virtual: true,
+        value: "worktree",
+        sha: headSha,
+        commitCount: 0,
+        label: "Uncommitted changes",
+        description: "Staged, unstaged, and untracked files",
+        latest: false,
+    } : null;
+    const commits = dirty ? [
+        ...committedChanges,
+        {
+            kind: "worktree",
+            virtual: true,
+            sha: "worktree",
+            shortSha: "worktree",
+            parentSha: headSha,
+            authoredAt: new Date().toISOString(),
+            author: "Local worktree",
+            subject: "Uncommitted changes",
+            dateLabel: "Current worktree",
+        },
+    ] : committedChanges;
+
+    const pushVersions = [
+        {
+            kind: "base",
+            value: "base",
+            sha: baseSha,
+            label: "Base version",
+            description: `Same as ${targetRef}`,
+            latest: committedVersions.length === 0,
+        },
+        ...committedVersions,
+        ...(worktreeVersion ? [worktreeVersion] : []),
+    ];
+    const defaultTo = pushVersions.at(-1).value;
+    return {
+        repoRoot,
+        branchName,
+        targetRef,
+        headSha,
+        upstream,
+        dirty,
+        base: { sha: baseSha, shortSha: baseSha.slice(0, 8), label: "Base version" },
+        commits,
+        pushVersions,
+        defaultSelection: { mode: "push", from: "base", to: defaultTo },
+    };
+};
+
+export const normalizeSelection = (model, selection = {}) => {
+    if (selection.mode === "commits" && model.commits.length > 0) {
+        const fromIndex = model.commits.findIndex((commit) => commit.sha === selection.from);
+        const toIndex = model.commits.findIndex((commit) => commit.sha === selection.to);
+        if (fromIndex >= 0 && toIndex >= fromIndex) {
+            return { mode: "commits", from: model.commits[fromIndex].sha, to: model.commits[toIndex].sha };
+        }
+        return {
+            mode: "commits",
+            from: model.commits[0].sha,
+            to: model.commits.at(-1).sha,
+        };
+    }
+
+    const fromIndex = model.pushVersions.findIndex((version) => version.value === selection.from);
+    const toIndex = model.pushVersions.findIndex((version) => version.value === selection.to);
+    if (fromIndex >= 0 && toIndex > fromIndex) {
+        return { mode: "push", from: model.pushVersions[fromIndex].value, to: model.pushVersions[toIndex].value };
+    }
+    return { ...model.defaultSelection };
+};
+
+const snapshotWorktreePatch = async (repoRoot, fromSha) => {
+    const tempDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "local-mr-worktree-"));
+    const indexPath = path.join(tempDirectory, "index");
+    const env = { GIT_INDEX_FILE: indexPath };
+    try {
+        await git(repoRoot, ["read-tree", "HEAD"], { env });
+        await git(repoRoot, ["add", "-A", "--", "."], { env });
+        return await git(repoRoot, ["diff", "--cached", "--find-renames", fromSha, "--"], { env });
+    } finally {
+        await fs.rm(tempDirectory, { recursive: true, force: true });
+    }
+};
+
+export const buildComparisonPatch = async ({ repoRoot, model, selection }) => {
+    const normalized = normalizeSelection(model, selection);
+    if (normalized.mode === "commits") {
+        const fromCommit = model.commits.find((commit) => commit.sha === normalized.from);
+        const toCommit = model.commits.find((commit) => commit.sha === normalized.to);
+        if (toCommit.kind === "worktree") {
+            return snapshotWorktreePatch(repoRoot, fromCommit.parentSha);
+        }
+        return git(repoRoot, ["diff", "--find-renames", fromCommit.parentSha, toCommit.sha, "--"]);
+    }
+
+    const fromVersion = model.pushVersions.find((version) => version.value === normalized.from);
+    const toVersion = model.pushVersions.find((version) => version.value === normalized.to);
+    if (toVersion.kind === "worktree") {
+        return snapshotWorktreePatch(repoRoot, fromVersion.sha);
+    }
+    return git(repoRoot, ["diff", "--find-renames", fromVersion.sha, toVersion.sha, "--"]);
+};
+
+const normalizeRepositoryPath = (filePath, label = "repository") => {
+    if (typeof filePath !== "string" || filePath.includes("\0") || filePath.includes("\\")) {
+        throw new Error(`Invalid ${label} path`);
+    }
+    const normalized = path.posix.normalize(filePath);
+    if (
+        normalized !== filePath
+        || normalized === "."
+        || normalized.startsWith("../")
+        || path.posix.isAbsolute(normalized)
+    ) {
+        throw new Error(`Invalid ${label} path`);
+    }
+    return normalized;
+};
+
+const comparisonBaseRevision = (model, selection) => {
+    const normalizedSelection = normalizeSelection(model, selection);
+    if (normalizedSelection.mode === "commits") {
+        const commit = model.commits.find((candidate) => candidate.sha === normalizedSelection.from);
+        if (!commit?.parentSha) throw new Error("Selected comparison base is unavailable");
+        return commit.parentSha;
+    }
+    const version = model.pushVersions.find((candidate) => candidate.value === normalizedSelection.from);
+    if (!version?.sha) throw new Error("Selected comparison base is unavailable");
+    return version.sha;
+};
+
+export const buildFileContext = async ({ repoRoot, model, selection, filePath, start, end }) => {
+    const normalizedPath = normalizeRepositoryPath(filePath);
+    if (
+        !Number.isSafeInteger(start)
+        || !Number.isSafeInteger(end)
+        || start < 1
+        || end < start
+    ) {
+        throw new Error("Invalid context line range");
+    }
+    const revision = comparisonBaseRevision(model, selection);
+    const content = await gitRaw(repoRoot, ["cat-file", "blob", `${revision}:${normalizedPath}`]);
+    if (content.includes("\0")) throw new Error("Diff context is unavailable for binary files");
+    const lines = content.split("\n");
+    if (lines.at(-1) === "") lines.pop();
+    const normalizedLines = lines.map((line) => line.replace(/\r$/, ""));
+    const totalLines = normalizedLines.length;
+    const boundedEnd = Math.min(end, totalLines);
+    return {
+        path: normalizedPath,
+        start,
+        end: boundedEnd,
+        totalLines,
+        hasMore: boundedEnd < totalLines,
+        lines: start <= boundedEnd ? normalizedLines.slice(start - 1, boundedEnd) : [],
+    };
+};
+
+const normalizePreviewPath = (filePath) => {
+    const normalized = normalizeRepositoryPath(filePath, "preview");
+    if (!/\.(?:md|markdown|mdown|mkd)$/i.test(normalized)) {
+        throw new Error("Preview is only available for Markdown files");
+    }
+    return normalized;
+};
+
+const assertPreviewSize = (content) => {
+    if (Buffer.byteLength(content) > maximumPreviewBytes) {
+        throw new Error("Markdown preview is larger than 2 MiB");
+    }
+    return content;
+};
+
+const readGitBlob = async (repoRoot, revision, filePath) => {
+    const objectName = `${revision}:${filePath}`;
+    const size = Number.parseInt(await git(repoRoot, ["cat-file", "-s", objectName]), 10);
+    if (!Number.isFinite(size) || size > maximumPreviewBytes) {
+        throw new Error("Markdown preview is larger than 2 MiB");
+    }
+    return gitRaw(repoRoot, ["cat-file", "blob", objectName]);
+};
+
+const readWorktreeFile = async (repoRoot, normalizedPath) => {
+    const absolutePath = path.resolve(repoRoot, normalizedPath);
+    const relativePath = path.relative(repoRoot, absolutePath);
+    if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+        throw new Error("Invalid preview path");
+    }
+    const file = await fs.lstat(absolutePath);
+    if (!file.isFile() || file.isSymbolicLink()) {
+        throw new Error("Markdown preview requires a regular file");
+    }
+    if (file.size > maximumPreviewBytes) {
+        throw new Error("Markdown preview is larger than 2 MiB");
+    }
+    return fs.readFile(absolutePath, "utf8");
+};
+
+export const buildFilePreview = async ({ repoRoot, model, selection, filePath }) => {
+    const normalizedPath = normalizePreviewPath(filePath);
+    const normalizedSelection = normalizeSelection(model, selection);
+    let content;
+
+    if (normalizedSelection.mode === "commits") {
+        const commit = model.commits.find((candidate) => candidate.sha === normalizedSelection.to);
+        content = commit.kind === "worktree"
+            ? await readWorktreeFile(repoRoot, normalizedPath)
+            : await readGitBlob(repoRoot, commit.sha, normalizedPath);
+    } else {
+        const version = model.pushVersions.find((candidate) => candidate.value === normalizedSelection.to);
+        if (version.kind === "worktree") {
+            content = await readWorktreeFile(repoRoot, normalizedPath);
+        } else {
+            content = await readGitBlob(repoRoot, version.sha, normalizedPath);
+        }
+    }
+
+    return {
+        path: normalizedPath,
+        markdown: true,
+        content: assertPreviewSize(content),
+    };
+};

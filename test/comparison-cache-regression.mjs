@@ -1,0 +1,135 @@
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+import { localMr } from "./helpers/paths.mjs";
+
+const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "local-mr-comparison-cache-test-"));
+const repoRoot = path.join(tempDirectory, "repo");
+const runtimeDirectory = path.join(tempDirectory, "runtime");
+const stateDirectory = path.join(tempDirectory, "state");
+let reviewUrl = "";
+
+const git = (args) => execFileSync("git", args, {
+    cwd: repoRoot,
+    encoding: "utf8",
+}).trim();
+
+const readReview = async () => {
+    const response = await fetch(reviewUrl);
+    reviewUrl = response.url;
+    return {
+        html: await response.text(),
+        modelCache: response.headers.get("x-local-mr-model-cache") || "",
+        patchCache: response.headers.get("x-local-mr-patch-cache") || "",
+        pageCache: response.headers.get("x-local-mr-page-cache") || "",
+    };
+};
+
+const diffCodeText = (html) => [...html.matchAll(
+    /<span class="d2h-code-line-ctn">([\s\S]*?)<\/span>/g,
+)]
+    .map((match) => match[1].replace(/<[^>]+>/g, ""))
+    .join("\n");
+
+try {
+    fs.mkdirSync(repoRoot, { recursive: true });
+    git(["init", "--initial-branch=main"]);
+    git(["config", "user.name", "Local MR Test"]);
+    git(["config", "user.email", "local-mr@example.invalid"]);
+    fs.writeFileSync(path.join(repoRoot, "example.txt"), "base\n");
+    git(["add", "example.txt"]);
+    git(["commit", "-m", "base"]);
+    git(["switch", "-c", "feature/comparison-cache"]);
+    fs.writeFileSync(path.join(repoRoot, "example.txt"), "base\none\n");
+
+    const output = execFileSync(localMr, ["main", "--no-open", "--light"], {
+        cwd: repoRoot,
+        encoding: "utf8",
+        env: {
+            ...process.env,
+            XDG_RUNTIME_DIR: runtimeDirectory,
+            XDG_STATE_HOME: stateDirectory,
+            LOCAL_MR_SERVER_IDLE_MINUTES: "1",
+        },
+    });
+    reviewUrl = output.match(/^Review: (.+)$/m)?.[1] || "";
+    if (!reviewUrl) throw new Error(`local-mr did not print a review URL:\n${output}`);
+
+    const cached = await readReview();
+    const cachedAgain = await readReview();
+
+    const changedPath = path.join(repoRoot, "example.txt");
+    fs.writeFileSync(changedPath, "base\ntwo\n");
+    const changedTime = new Date(Date.now() + 2_000);
+    fs.utimesSync(changedPath, changedTime, changedTime);
+
+    const changed = await readReview();
+    const changedAgain = await readReview();
+    const changedCode = diffCodeText(changed.html);
+
+    git(["add", "example.txt"]);
+    git(["commit", "-m", "committed comparison change"]);
+    fs.writeFileSync(changedPath, "base\ntri\n");
+    const newHeadReview = await readReview();
+    const newHeadReviewAgain = await readReview();
+    const newHeadCode = diffCodeText(newHeadReview.html);
+    const checks = {
+        "repeated reviews reuse model patch and rendered page": cached.modelCache === "hit"
+            && cached.patchCache === "hit"
+            && cached.pageCache === "hit"
+            && cachedAgain.modelCache === "hit"
+            && cachedAgain.patchCache === "hit"
+            && cachedAgain.pageCache === "hit",
+        "same-size worktree edits invalidate only content-dependent caches": changed.modelCache === "hit"
+            && changed.patchCache === "miss"
+            && changed.pageCache === "miss"
+            && changedCode.includes("two")
+            && !changedCode.includes("one"),
+        "the changed worktree snapshot is cached for the next review": changedAgain.modelCache === "hit"
+            && changedAgain.patchCache === "hit"
+            && changedAgain.pageCache === "hit",
+        "a new HEAD invalidates model patch and rendered page caches": newHeadReview.modelCache === "miss"
+            && newHeadReview.patchCache === "miss"
+            && newHeadReview.pageCache === "miss"
+            && newHeadCode.includes("tri"),
+        "the new HEAD snapshot is cached for the next review": newHeadReviewAgain.modelCache === "hit"
+            && newHeadReviewAgain.patchCache === "hit"
+            && newHeadReviewAgain.pageCache === "hit",
+    };
+    console.log(JSON.stringify({
+        cached: {
+            modelCache: cached.modelCache,
+            patchCache: cached.patchCache,
+            pageCache: cached.pageCache,
+        },
+        changed: {
+            modelCache: changed.modelCache,
+            patchCache: changed.patchCache,
+            pageCache: changed.pageCache,
+        },
+        changedAgain: {
+            modelCache: changedAgain.modelCache,
+            patchCache: changedAgain.patchCache,
+            pageCache: changedAgain.pageCache,
+        },
+        newHeadReview: {
+            modelCache: newHeadReview.modelCache,
+            patchCache: newHeadReview.patchCache,
+            pageCache: newHeadReview.pageCache,
+        },
+        checks,
+    }, null, 2));
+    if (Object.values(checks).some((passed) => !passed)) process.exitCode = 1;
+} finally {
+    if (reviewUrl) {
+        try {
+            const healthUrl = new URL(reviewUrl);
+            healthUrl.pathname = healthUrl.pathname.replace(/\/review$/, "/health");
+            const health = await fetch(healthUrl).then((response) => response.json());
+            process.kill(health.pid, "SIGTERM");
+        } catch {}
+    }
+    fs.rmSync(tempDirectory, { recursive: true, force: true });
+}

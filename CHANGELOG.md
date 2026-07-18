@@ -1,0 +1,10 @@
+# Changelog
+
+English | [简体中文](docs/zh-CN/CHANGELOG.md)
+
+## Unreleased
+
+- Review committed and uncommitted branch changes in one local browser workspace.
+- Compare individual commits, contiguous ranges, push snapshots, and the current worktree.
+- Render lazy side-by-side or line-by-line diffs with expandable context, Markdown, and Mermaid previews.
+- Keep source, read state, and tokenized review pages local.

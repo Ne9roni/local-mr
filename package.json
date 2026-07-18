@@ -1,0 +1,38 @@
+{
+  "name": "local-mr",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Review your whole Git branch in a local MR-style browser UI before pushing.",
+  "bin": {
+    "local-mr": "bin/local-mr"
+  },
+  "files": [
+    "bin",
+    "src",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "check": "npm run lint && npm test",
+    "verify": "npm run check && npm run test:browser",
+    "lint": "node scripts/check-syntax.mjs",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "node --test test/version-model.test.mjs test/review-render.test.mjs test/public-report.test.mjs",
+    "test:integration": "node test/comparison-cache-regression.mjs && node test/context-endpoint-regression.mjs && node test/read-state-regression.mjs && node test/cli-scan-regression.mjs && node test/install-regression.mjs",
+    "test:browser": "node scripts/test-browser.mjs",
+    "install:local": "bash scripts/install.sh",
+    "install:link": "bash scripts/install.sh --link",
+    "uninstall:local": "bash scripts/uninstall.sh"
+  },
+  "dependencies": {
+    "diff2html": "3.4.56",
+    "dompurify": "3.4.12",
+    "marked": "18.0.6",
+    "mermaid": "11.16.0"
+  }
+}

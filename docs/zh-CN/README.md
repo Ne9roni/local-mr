@@ -1,0 +1,11 @@
+# 简体中文文档
+
+[English documentation](../../README.md) | 简体中文
+
+- [项目介绍、安装与使用](../../README.zh-CN.md)
+- [架构设计](architecture.md)
+- [贡献指南](CONTRIBUTING.md)
+- [安全策略](SECURITY.md)
+- [变更日志](CHANGELOG.md)
+
+代码标识符、命令、环境变量和文件路径保留英文，以便与实现及终端输出保持一致。

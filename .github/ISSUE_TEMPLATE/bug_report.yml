@@ -1,0 +1,45 @@
+name: Bug report
+description: Report reproducible incorrect behavior in local-mr
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping improve local-mr. Remove private repository data from logs and screenshots before submitting.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the actual and expected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Include the command, options, a neutral placeholder target ref, and minimal steps. Do not paste the generated review URL.
+      placeholder: |
+        1. Run `local-mr origin/main`
+        2. Wait for the review to open in the browser
+        3. Select ...
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node.js version
+      placeholder: v22.x
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      placeholder: Ubuntu 24.04, WSL2, etc.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs or screenshots
+      description: Do not include repository tokens, private source code, or personal information.
+      render: shell
