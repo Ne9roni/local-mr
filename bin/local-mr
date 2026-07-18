@@ -7,10 +7,11 @@ usage() {
     cat <<'EOF'
 Usage: local-mr [target-ref] [options]
 
-Render the current working tree as a local, MR-style HTML diff.
-The comparison includes committed, staged, unstaged, and untracked changes
-without modifying the repository's real Git index. The browser view can switch
-between upstream push snapshots and individual/ranged commits.
+Render the current branch as a local, MR-style HTML diff.
+The default comparison includes committed changes only. Staged, unstaged, and
+untracked changes remain an explicit final worktree checkpoint, without ever
+modifying the repository's real Git index. The browser view switches between
+one selected commit and an inclusive contiguous commit range.
 
 Arguments:
   target-ref           Target branch/ref (auto-detected when omitted)
@@ -30,6 +31,9 @@ Options:
       --dark           Force the dark color scheme
       --auto-color     Follow the browser color scheme (default)
   -h, --help           Show this help
+
+Agent-guided virtual commits:
+  local-mr virtual-commit help
 
 Examples:
   local-mr
@@ -58,45 +62,22 @@ print_open_link() {
 }
 
 open_review() {
-    local file_path=$1
-    local review_url=$2
+    local review_url=$1
 
-    if [[ -n "${WSL_DISTRO_NAME:-}" ]] && \
-        command -v explorer.exe >/dev/null 2>&1; then
-        if explorer.exe "$review_url" >/dev/null 2>&1; then
-            return 0
-        fi
+    if [[ -n "${WSL_DISTRO_NAME:-}" ]]; then
+        command -v explorer.exe >/dev/null 2>&1 || return 1
+        explorer.exe "$review_url" >/dev/null 2>&1 || true
+        return 0
     fi
 
-    if command -v wslview >/dev/null 2>&1; then
-        if wslview "$review_url" >/dev/null 2>&1; then
-            return 0
-        fi
+    if [[ "$(uname -s)" == Darwin ]]; then
+        command -v open >/dev/null 2>&1 || return 1
+        open "$review_url" >/dev/null 2>&1
+        return
     fi
 
-    if command -v open >/dev/null 2>&1; then
-        if open "$review_url" >/dev/null 2>&1; then
-            return 0
-        fi
-    fi
-
-    if command -v xdg-open >/dev/null 2>&1; then
-        if xdg-open "$review_url" >/dev/null 2>&1; then
-            return 0
-        fi
-    fi
-
-    if [[ -n "${WSL_DISTRO_NAME:-}" ]] && \
-        command -v wslpath >/dev/null 2>&1 && \
-        command -v explorer.exe >/dev/null 2>&1; then
-        local windows_path
-        windows_path=$(wslpath -w "$file_path" 2>/dev/null || true)
-        if [[ -n "$windows_path" ]] && explorer.exe "$windows_path" >/dev/null 2>&1; then
-            return 0
-        fi
-    fi
-
-    return 1
+    command -v xdg-open >/dev/null 2>&1 || return 1
+    xdg-open "$review_url" >/dev/null 2>&1
 }
 
 target_ref=""
@@ -104,6 +85,10 @@ output_file="${LOCAL_MR_OUTPUT:-}"
 open_browser=true
 style="side"
 color_scheme="auto"
+frozen_base=""
+frozen_head=""
+frozen_target=""
+frozen_branch=""
 script_path=${BASH_SOURCE[0]}
 if command -v readlink >/dev/null 2>&1; then
     script_path=$(readlink -f "$script_path" 2>/dev/null || printf '%s' "$script_path")
@@ -128,6 +113,16 @@ if [[ ! -r "$runtime_package_dir/package.json" && -r "$runtime_dir/../package.js
 fi
 review_ui_fragment="${LOCAL_MR_UI_FRAGMENT:-$runtime_dir/review-ui.html}"
 version_server="${LOCAL_MR_VERSION_SERVER:-$runtime_dir/version-server.mjs}"
+virtual_review_cli="${LOCAL_MR_VIRTUAL_REVIEW_CLI:-$runtime_dir/virtual-review-cli.mjs}"
+
+if [[ "${1:-}" == "virtual-commit" ]]; then
+    shift
+    [[ -r "$virtual_review_cli" ]] || die "virtual review CLI not found: $virtual_review_cli"
+    node_bin=$(command -v node || true)
+    [[ -n "$node_bin" ]] || die "Node.js is required for virtual commit reviews"
+    export LOCAL_MR_COMMAND="$script_path"
+    exec "$node_bin" "$virtual_review_cli" "$@"
+fi
 
 while (($# > 0)); do
     case "$1" in
@@ -159,6 +154,26 @@ while (($# > 0)); do
         --auto-color)
             color_scheme="auto"
             shift
+            ;;
+        --frozen-base)
+            (($# >= 2)) || die "$1 requires a commit"
+            frozen_base=$2
+            shift 2
+            ;;
+        --frozen-head)
+            (($# >= 2)) || die "$1 requires a commit"
+            frozen_head=$2
+            shift 2
+            ;;
+        --frozen-target)
+            (($# >= 2)) || die "$1 requires a commit"
+            frozen_target=$2
+            shift 2
+            ;;
+        --frozen-branch)
+            (($# >= 2)) || die "$1 requires a branch label"
+            frozen_branch=$2
+            shift 2
             ;;
         -h|--help)
             usage
@@ -220,8 +235,26 @@ fi
 git rev-parse --verify --quiet "${target_ref}^{commit}" >/dev/null || \
     die "target ref does not exist: $target_ref"
 
+frozen_count=0
+for value in "$frozen_base" "$frozen_head" "$frozen_target" "$frozen_branch"; do
+    [[ -z "$value" ]] || ((frozen_count += 1))
+done
+if ((frozen_count != 0 && frozen_count != 4)); then
+    die "frozen comparisons require --frozen-base, --frozen-head, --frozen-target, and --frozen-branch together"
+fi
+if ((frozen_count == 4)); then
+    frozen_base=$(git rev-parse --verify "${frozen_base}^{commit}") || die "frozen base commit does not exist"
+    frozen_head=$(git rev-parse --verify "${frozen_head}^{commit}") || die "frozen head commit does not exist"
+    frozen_target=$(git rev-parse --verify "${frozen_target}^{commit}") || die "frozen target commit does not exist"
+    frozen_merge_base=$(git merge-base "$frozen_head" "$frozen_target")
+    [[ "$frozen_merge_base" == "$frozen_base" ]] || \
+        die "frozen base is not the merge base of the frozen head and target"
+fi
+
+display_branch_name=${frozen_branch:-$branch_name}
+
 repo_name=$(basename "$repo_root")
-safe_branch=$(printf '%s' "$branch_name" | tr '/[:space:]' '--')
+safe_branch=$(printf '%s' "$display_branch_name" | tr '/[:space:]' '--')
 safe_target=$(printf '%s' "$target_ref" | tr '/[:space:]' '--')
 
 if [[ -z "$output_file" ]]; then
@@ -256,9 +289,12 @@ server_fingerprint=$(
         "$version_server" \
         "$(dirname "$version_server")/version-model.mjs" \
         "$(dirname "$version_server")/review-render.mjs" \
+        "$(dirname "$version_server")/virtual-review-discovery.mjs" \
+        "$(dirname "$version_server")/virtual-review-store.mjs" \
         "$review_ui_fragment" \
         "$runtime_package_dir/package.json" \
         "$runtime_package_dir/node_modules/diff2html/bundles/css/diff2html.min.css" \
+        "$runtime_package_dir/node_modules/diff2html/bundles/js/diff2html-ui-slim.min.js" \
         "$runtime_package_dir/node_modules/marked/lib/marked.umd.js" \
         "$runtime_package_dir/node_modules/dompurify/dist/purify.min.js" \
         "$runtime_package_dir/node_modules/mermaid/dist/mermaid.min.js" |
@@ -266,8 +302,9 @@ server_fingerprint=$(
         cut -c1-16
 )
 runtime_key=$(
-    printf '%s\0%s\0%s\0%s\0%s' \
-        "$repo_root" "$target_ref" "$style" "$color_scheme" "$server_fingerprint" |
+    printf '%s\0%s\0%s\0%s\0%s\0%s\0%s\0%s\0%s' \
+        "$repo_root" "$target_ref" "$style" "$color_scheme" "$server_fingerprint" \
+        "$frozen_base" "$frozen_head" "$frozen_target" "$frozen_branch" |
         sha256sum |
         cut -c1-16
 )
@@ -310,8 +347,17 @@ if [[ -z "$review_url" ]]; then
         --color "$color_scheme" \
         --fragment "$review_ui_fragment" \
         --ready "$ready_file" \
+        --command "$script_path" \
         --idle-minutes "${LOCAL_MR_SERVER_IDLE_MINUTES:-480}"
     )
+    if ((frozen_count == 4)); then
+        server_command+=(
+            --frozen-base "$frozen_base"
+            --frozen-head "$frozen_head"
+            --frozen-target "$frozen_target"
+            --frozen-branch "$frozen_branch"
+        )
+    fi
     server_pid=""
     if command -v setsid >/dev/null 2>&1; then
         setsid --fork "${server_command[@]}" </dev/null >"$server_log" 2>&1
@@ -375,7 +421,7 @@ grep -q 'id="local-mr-version-data"' "$output_temp" || die "version data was not
 mv -f -- "$output_temp" "$output_file"
 output_temp=""
 
-printf 'Local MR: %s → %s\n' "$branch_name" "$target_ref"
+printf 'Local MR: %s → %s\n' "$display_branch_name" "$target_ref"
 printf '%s\n' "$shortstat"
 printf 'HTML snapshot: %s\n' "$output_file"
 printf 'Review: %s\n' "$review_url"
@@ -383,7 +429,7 @@ printf 'Review: %s\n' "$review_url"
 print_open_link "$review_url"
 
 if [[ "$open_browser" == true ]]; then
-    if ! open_review "$output_file" "$review_url"; then
+    if ! open_review "$review_url"; then
         printf 'Could not open the browser automatically; use the link above.\n' >&2
     fi
 fi

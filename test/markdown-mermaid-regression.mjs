@@ -5,6 +5,7 @@ import path from "node:path";
 
 import { openChromePage } from "./helpers/chrome.mjs";
 import { localMr } from "./helpers/paths.mjs";
+import { printPublicTestReport } from "./helpers/public-report.mjs";
 
 const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "local-mr-markdown-test-"));
 const repoRoot = path.join(tempDirectory, "repo");
@@ -54,6 +55,8 @@ try {
     git(["mv", "docs/old-design.md", "docs/design.md"]);
     git(["rm", "docs/deleted.md"]);
     fs.writeFileSync(path.join(repoRoot, "docs", "architecture → v2.md"), "# Literal arrow filename\n");
+    git(["add", "-A"]);
+    git(["commit", "-m", "change Markdown preview fixture"]);
     const output = execFileSync(localMr, ["main", "--no-open", "--dark", "--line", "-o", outputFile], {
         cwd: repoRoot,
         encoding: "utf8",
@@ -192,7 +195,7 @@ try {
             && literalArrowResult.error === "",
         "deleted Markdown does not expose a broken right-side preview": !deletedResult.hasPreviewToggle,
     };
-    console.log(JSON.stringify({ reviewUrl, result, literalArrowResult, deletedResult, checks }, null, 2));
+    printPublicTestReport({ reviewUrl, result, literalArrowResult, deletedResult, checks });
     if (Object.values(checks).some((passed) => !passed)) process.exitCode = 1;
 } finally {
     browser?.close();

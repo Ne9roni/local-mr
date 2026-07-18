@@ -10,6 +10,7 @@
   "files": [
     "bin",
     "src",
+    "skills",
     "LICENSE",
     "THIRD_PARTY_NOTICES.md"
   ],
@@ -22,8 +23,8 @@
     "verify": "npm run check && npm run test:browser",
     "lint": "node scripts/check-syntax.mjs",
     "test": "npm run test:unit && npm run test:integration",
-    "test:unit": "node --test test/version-model.test.mjs test/review-render.test.mjs test/public-report.test.mjs",
-    "test:integration": "node test/comparison-cache-regression.mjs && node test/context-endpoint-regression.mjs && node test/read-state-regression.mjs && node test/cli-scan-regression.mjs && node test/install-regression.mjs",
+    "test:unit": "node --test test/version-model.test.mjs test/review-render.test.mjs test/public-report.test.mjs test/virtual-diff.test.mjs test/virtual-review-discovery.test.mjs test/virtual-review-manifest.test.mjs test/virtual-review-runtime.test.mjs test/virtual-review-store.test.mjs",
+    "test:integration": "node test/comparison-cache-regression.mjs && node test/context-endpoint-regression.mjs && node test/read-state-regression.mjs && node test/cli-scan-regression.mjs && node test/virtual-review-regression.mjs && node test/virtual-review-attachment-regression.mjs && node test/install-regression.mjs",
     "test:browser": "node scripts/test-browser.mjs",
     "install:local": "bash scripts/install.sh",
     "install:link": "bash scripts/install.sh --link",

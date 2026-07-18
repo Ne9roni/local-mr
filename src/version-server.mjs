@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import crypto from "node:crypto";
+import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import http from "node:http";
 import os from "node:os";
@@ -16,9 +17,16 @@ import {
     inspectRepositoryState,
     normalizeSelection,
 } from "./version-model.mjs";
-import { patchSummary, renderDiffDocument, splitRenderedReview } from "./review-render.mjs";
+import {
+    injectReviewUi,
+    patchSummary,
+    renderDiffDocument,
+    splitRenderedReview,
+} from "./review-render.mjs";
+import { discoverVirtualReview } from "./virtual-review-discovery.mjs";
 
 const brotliCompressAsync = promisify(brotliCompress);
+const execFileAsync = promisify(execFile);
 
 const parseArguments = (values) => {
     const options = {};
@@ -40,10 +48,61 @@ const htmlEscape = (value) => String(value)
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 
-const safeJson = (value) => JSON.stringify(value)
-    .replaceAll("<", "\\u003c")
-    .replaceAll(">", "\\u003e")
-    .replaceAll("&", "\\u0026");
+const loopbackReviewUrl = (value) => {
+    if (!value || value.length > 4096) return "";
+    try {
+        const parsed = new URL(value);
+        const loopback = parsed.hostname === "127.0.0.1"
+            || parsed.hostname === "localhost"
+            || parsed.hostname === "[::1]";
+        if (parsed.protocol !== "http:" || !loopback || parsed.username || parsed.password) return "";
+        if (!/^\/[A-Za-z0-9_-]{24}\/(?:review|commit\/\d+\/review)$/.test(parsed.pathname)) return "";
+        return parsed.href;
+    } catch {
+        return "";
+    }
+};
+
+const localRealReviewUrl = (value, { origin, rootPath }) => {
+    if (!value || value.length > 4096) return "";
+    try {
+        const parsed = new URL(value);
+        if (
+            parsed.origin !== origin
+            || parsed.pathname !== `${rootPath}/review`
+            || parsed.username
+            || parsed.password
+        ) return "";
+        return parsed.href;
+    } catch {
+        return "";
+    }
+};
+
+const commitsInSelection = (model, selection) => {
+    const fromIndex = model.commits.findIndex((commit) => commit.sha === selection.from);
+    const toIndex = model.commits.findIndex((commit) => commit.sha === selection.to);
+    return fromIndex >= 0 && toIndex >= fromIndex
+        ? model.commits.slice(fromIndex, toIndex + 1)
+        : [];
+};
+
+const focusedCommitForSelection = (model, selection) => {
+    const selected = commitsInSelection(model, selection);
+    if (selected.length !== 1) return null;
+    const [commit] = selected;
+    return {
+        kind: "real",
+        label: commit.virtual ? "Working tree" : "Git commit message",
+        orderLabel: commit.virtual ? "Uncommitted" : commit.shortSha,
+        title: commit.subject,
+        description: commit.body || "",
+        meta: commit.virtual
+            ? commit.dateLabel
+            : [commit.author, commit.dateLabel].filter(Boolean).join(" / "),
+        reviewFocus: [],
+    };
+};
 
 const clientModel = ({
     model,
@@ -54,6 +113,7 @@ const clientModel = ({
     filePatchIds,
     files,
     readStateId,
+    reviewNavigation,
 }) => ({
     reviewUrl,
     reviewDataUrl: `${rootUrl}/review-data`,
@@ -61,7 +121,9 @@ const clientModel = ({
     contextUrl: `${rootUrl}/diff-context`,
     previewUrl: `${rootUrl}/file`,
     readStateUrl: `${rootUrl}/read-state/${readStateId}`,
+    ...(reviewNavigation ? { reviewNavigation } : {}),
     assets: {
+        syntaxHighlight: `${rootUrl}/assets/syntax-highlight.js`,
         marked: `${rootUrl}/assets/marked.js`,
         dompurify: `${rootUrl}/assets/dompurify.js`,
         mermaid: `${rootUrl}/assets/mermaid.js`,
@@ -74,34 +136,34 @@ const clientModel = ({
     branchName: model.branchName,
     targetRef: model.targetRef,
     dirty: model.dirty,
-    pushVersions: model.pushVersions.map((version) => ({
-        kind: version.kind,
-        virtual: Boolean(version.virtual),
-        value: version.value,
-        label: version.label,
-        description: version.description,
-        latest: Boolean(version.latest),
-        shortSha: version.sha.slice(0, 8),
-    })),
+    focusedCommit: focusedCommitForSelection(model, selection),
+    modeDefaults: {
+        single: model.commits.length > 0 ? {
+            mode: "single",
+            from: model.commits[0].sha,
+            to: model.commits[0].sha,
+        } : null,
+        range: (() => {
+            const committed = model.commits.filter((commit) => !commit.virtual);
+            const candidates = committed.length > 0 ? committed : model.commits;
+            return candidates.length > 0 ? {
+                mode: "range",
+                from: candidates[0].sha,
+                to: candidates.at(-1).sha,
+            } : null;
+        })(),
+    },
     commits: model.commits.map((commit) => ({
         kind: commit.kind || "commit",
         virtual: Boolean(commit.virtual),
         sha: commit.sha,
         shortSha: commit.shortSha,
         subject: commit.subject,
+        body: commit.body || "",
         author: commit.author,
         dateLabel: commit.dateLabel,
     })),
 });
-
-const injectReviewUi = ({ html, fragment, versionData }) => {
-    const injection = [
-        `<script id="local-mr-version-data" type="application/json">${safeJson(versionData)}</script>`,
-        fragment,
-    ].join("\n");
-    if (!html.includes("</head>")) throw new Error("diff2html output does not contain </head>");
-    return html.replace("</head>", `${injection}\n</head>`);
-};
 
 const errorPage = (error) => `<!doctype html>
 <html lang="en">
@@ -116,8 +178,20 @@ const required = ["repo", "target", "style", "color", "fragment", "ready"];
 for (const name of required) {
     if (!options[name]) throw new Error(`Missing --${name}`);
 }
+const frozenOptionNames = ["frozen-base", "frozen-head", "frozen-target", "frozen-branch"];
+const frozenOptionCount = frozenOptionNames.filter((name) => Boolean(options[name])).length;
+if (frozenOptionCount !== 0 && frozenOptionCount !== frozenOptionNames.length) {
+    throw new Error("Frozen comparisons require base, head, target, and branch arguments together");
+}
+const frozenComparison = frozenOptionCount === frozenOptionNames.length ? {
+    baseSha: options["frozen-base"],
+    headSha: options["frozen-head"],
+    targetSha: options["frozen-target"],
+    branchName: options["frozen-branch"],
+} : null;
 
 const repoRoot = path.resolve(options.repo);
+const localMrCommand = options.command || process.env.LOCAL_MR_COMMAND || "";
 const reviewFragment = await fs.readFile(options.fragment, "utf8");
 const runtimeRoot = await (async () => {
     const candidates = [new URL("./", import.meta.url), new URL("../", import.meta.url)];
@@ -135,6 +209,10 @@ const diff2htmlStylesheet = await fs.readFile(
 );
 const token = crypto.randomBytes(18).toString("base64url");
 const assetFiles = new Map([
+    [
+        "syntax-highlight.js",
+        new URL("node_modules/diff2html/bundles/js/diff2html-ui-slim.min.js", runtimeRoot),
+    ],
     ["marked.js", new URL("node_modules/marked/lib/marked.umd.js", runtimeRoot)],
     ["dompurify.js", new URL("node_modules/dompurify/dist/purify.min.js", runtimeRoot)],
     ["mermaid.js", new URL("node_modules/mermaid/dist/mermaid.min.js", runtimeRoot)],
@@ -217,6 +295,7 @@ const fragmentCache = createLruCache({
 const renderJobs = new Map();
 const modelJobs = new Map();
 const patchJobs = new Map();
+const virtualReviewJobs = new Map();
 const readStateDirectory = path.join(
     process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local", "state"),
     "local-mr",
@@ -347,11 +426,23 @@ const readStateIdFor = ({ model, selection }) => crypto.createHash("sha256")
     }))
     .digest("hex");
 
+const inspectReviewRepositoryState = () => inspectRepositoryState({
+    repoRoot,
+    targetRef: options.target,
+    frozen: frozenComparison,
+});
+
+const commitReference = (sha, fallback = {}) => {
+    if (typeof sha !== "string" || sha.length === 0) return null;
+    return {
+        ...fallback,
+        sha,
+        shortSha: fallback.shortSha || sha.slice(0, 8),
+    };
+};
+
 const buildReviewContext = async ({ origin, rootPath, searchParams, allowEmpty = false }) => {
-    const repositoryState = await inspectRepositoryState({
-        repoRoot,
-        targetRef: options.target,
-    });
+    const repositoryState = await inspectReviewRepositoryState();
     const { model, cacheStatus: modelCacheStatus } = await getVersionModel(repositoryState);
     const selection = normalizeSelection(model, {
         mode: searchParams.get("mode") || undefined,
@@ -368,15 +459,65 @@ const buildReviewContext = async ({ origin, rootPath, searchParams, allowEmpty =
     const { filePatchIds, files } = buildFilePatchData(patchText);
     const readStateId = readStateIdFor({ model, selection });
     const title = `Local MR: ${model.branchName} → ${model.targetRef}`;
+    const virtualReviewUrl = loopbackReviewUrl(searchParams.get("virtual-review-url") || "");
+    const discoveredVirtualReview = !virtualReviewUrl && !frozenComparison
+        ? await discoverVirtualReview({
+            repoRoot,
+            branchName: model.branchName,
+            targetRef: model.targetRef,
+            baseSha: model.base.sha,
+            headSha: model.headSha,
+            targetSha: repositoryState.targetSha,
+        }).catch(() => null)
+        : null;
+    const discoveredVirtualUrl = (() => {
+        if (!discoveredVirtualReview) return "";
+        const destination = new URL(`${origin}${rootPath}/virtual-review`);
+        destination.searchParams.set("review", discoveredVirtualReview.reviewId);
+        destination.searchParams.set("revision", String(discoveredVirtualReview.revision));
+        return destination.href;
+    })();
+    const navigationVirtualUrl = virtualReviewUrl || discoveredVirtualUrl || null;
+    const reviewBaseUrl = new URL(`${origin}${rootPath}/review`);
+    if (virtualReviewUrl) reviewBaseUrl.searchParams.set("virtual-review-url", virtualReviewUrl);
+    const realReviewUrl = new URL(reviewBaseUrl);
+    realReviewUrl.searchParams.set("mode", selection.mode);
+    realReviewUrl.searchParams.set("from", selection.from);
+    realReviewUrl.searchParams.set("to", selection.to);
     const versionData = clientModel({
         model,
         selection,
-        reviewUrl: `${origin}${rootPath}/review`,
+        reviewUrl: reviewBaseUrl.href,
         rootUrl: `${origin}${rootPath}`,
         patchId,
         filePatchIds,
         files,
         readStateId,
+        reviewNavigation: {
+            active: "real",
+            realUrl: realReviewUrl.href,
+            virtualUrl: navigationVirtualUrl,
+            virtualState: discoveredVirtualReview?.state || (virtualReviewUrl ? "current" : "missing"),
+            virtualReview: discoveredVirtualReview ? {
+                reviewId: discoveredVirtualReview.reviewId,
+                revision: discoveredVirtualReview.revision,
+                title: discoveredVirtualReview.title || "",
+                sourceCommit: discoveredVirtualReview.sourceCommit || commitReference(
+                    discoveredVirtualReview.sourceSha
+                        || discoveredVirtualReview.sourceBoundary?.headSha,
+                    { shortSha: discoveredVirtualReview.sourceShortSha },
+                ),
+                currentCommit: discoveredVirtualReview.currentCommit || commitReference(
+                    discoveredVirtualReview.currentSha
+                        || discoveredVirtualReview.currentBoundary?.headSha
+                        || model.headSha,
+                    { shortSha: discoveredVirtualReview.currentShortSha },
+                ),
+            } : null,
+            virtualUnavailableReason: navigationVirtualUrl
+                ? null
+                : "No matching Virtual Review is attached to this comparison",
+        },
     });
     const cacheKey = crypto.createHash("sha256")
         .update(options.style)
@@ -398,8 +539,48 @@ const buildReviewContext = async ({ origin, rootPath, searchParams, allowEmpty =
         selection,
         summary,
         title,
+        discoveredVirtualReview,
+        virtualReviewUrl,
         versionData,
     };
+};
+
+const openVirtualReview = async ({ reviewId, revision }) => {
+    if (!localMrCommand) throw new Error("The local-mr command is unavailable");
+    const key = `${reviewId}:${revision}`;
+    let job = virtualReviewJobs.get(key);
+    if (!job) {
+        job = (async () => {
+            const { stdout } = await execFileAsync(localMrCommand, [
+                "virtual-commit",
+                "open",
+                reviewId,
+                "--revision",
+                String(revision),
+                "--no-open",
+            ], {
+                cwd: repoRoot,
+                env: { ...process.env, LOCAL_MR_COMMAND: localMrCommand },
+                timeout: 60_000,
+                maxBuffer: 4 * 1024 * 1024,
+            });
+            const result = JSON.parse(stdout);
+            const reviewUrl = loopbackReviewUrl(result.reviewUrl || "");
+            if (
+                result.ok !== true
+                || result.reviewId !== reviewId
+                || result.revision !== revision
+                || !reviewUrl
+            ) throw new Error("The Virtual Review server returned an invalid result");
+            return reviewUrl;
+        })();
+        virtualReviewJobs.set(key, job);
+    }
+    try {
+        return await job;
+    } finally {
+        if (virtualReviewJobs.get(key) === job) virtualReviewJobs.delete(key);
+    }
 };
 
 const fragmentCacheKey = (patchId, wrapperId) => `${patchId}:${wrapperId}`;
@@ -565,6 +746,7 @@ server = http.createServer(async (request, response) => {
     response.setHeader("Cache-Control", "no-store");
     response.setHeader("Access-Control-Allow-Origin", "*");
     response.setHeader("X-Content-Type-Options", "nosniff");
+    response.setHeader("Referrer-Policy", "no-referrer");
 
     if (request.method === "OPTIONS") {
         response.statusCode = 204;
@@ -595,6 +777,60 @@ server = http.createServer(async (request, response) => {
         response.statusCode = 302;
         response.setHeader("Location", `${rootPath}/review`);
         response.end();
+        return;
+    }
+    if (url.pathname === `${rootPath}/virtual-review`) {
+        if (request.method !== "GET") {
+            response.statusCode = 405;
+            response.setHeader("Allow", "GET");
+            response.end("Method not allowed");
+            return;
+        }
+        const requestedReviewId = url.searchParams.get("review") || "";
+        const requestedRevision = Number(url.searchParams.get("revision"));
+        if (
+            !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(requestedReviewId)
+            || !Number.isSafeInteger(requestedRevision)
+            || requestedRevision < 1
+        ) {
+            response.statusCode = 400;
+            response.end("Invalid Virtual Review request");
+            return;
+        }
+        try {
+            const context = await buildReviewContext({
+                origin,
+                rootPath,
+                searchParams: url.searchParams,
+                allowEmpty: true,
+            });
+            const discovered = context.discoveredVirtualReview;
+            if (
+                !discovered
+                || discovered.reviewId !== requestedReviewId
+                || discovered.revision !== requestedRevision
+            ) {
+                response.statusCode = 409;
+                response.end("The attached Virtual Review changed; reload the Real Review");
+                return;
+            }
+            const liveRealUrl = localRealReviewUrl(url.searchParams.get("return") || "", {
+                origin,
+                rootPath,
+            }) || context.versionData.reviewNavigation.realUrl;
+            const virtualReviewUrl = new URL(await openVirtualReview({
+                reviewId: requestedReviewId,
+                revision: requestedRevision,
+            }));
+            virtualReviewUrl.searchParams.set("real-review-url", liveRealUrl);
+            response.statusCode = 302;
+            response.setHeader("Location", virtualReviewUrl.href);
+            response.end();
+        } catch (error) {
+            response.statusCode = 502;
+            response.setHeader("Content-Type", "text/plain; charset=utf-8");
+            response.end(`Could not open the attached Virtual Review: ${error.message}`);
+        }
         return;
     }
     const assetName = url.pathname.startsWith(`${rootPath}/assets/`)
@@ -643,10 +879,7 @@ server = http.createServer(async (request, response) => {
     }
     if (url.pathname === `${rootPath}/file`) {
         try {
-            const repositoryState = await inspectRepositoryState({
-                repoRoot,
-                targetRef: options.target,
-            });
+            const repositoryState = await inspectReviewRepositoryState();
             const { model, cacheStatus } = await getVersionModel(repositoryState);
             const selection = normalizeSelection(model, {
                 mode: url.searchParams.get("mode") || undefined,
@@ -749,7 +982,12 @@ server = http.createServer(async (request, response) => {
             return;
         }
         try {
-            const context = await buildReviewContext({ origin, rootPath, searchParams: url.searchParams });
+            const context = await buildReviewContext({
+                origin,
+                rootPath,
+                searchParams: url.searchParams,
+                allowEmpty: true,
+            });
             if (context.patchId !== patchId) {
                 response.statusCode = 409;
                 response.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -789,7 +1027,12 @@ server = http.createServer(async (request, response) => {
     }
     if (url.pathname === `${rootPath}/review-data`) {
         try {
-            const context = await buildReviewContext({ origin, rootPath, searchParams: url.searchParams });
+            const context = await buildReviewContext({
+                origin,
+                rootPath,
+                searchParams: url.searchParams,
+                allowEmpty: true,
+            });
             const { page, pageCacheStatus } = await renderReviewPage(context);
             setContextCacheHeaders(response, context, pageCacheStatus);
             response.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -813,11 +1056,19 @@ server = http.createServer(async (request, response) => {
     }
 
     try {
-        const context = await buildReviewContext({ origin, rootPath, searchParams: url.searchParams });
+        const context = await buildReviewContext({
+            origin,
+            rootPath,
+            searchParams: url.searchParams,
+            allowEmpty: true,
+        });
         const canonical = new URL(`${origin}${rootPath}/review`);
         canonical.searchParams.set("mode", context.selection.mode);
         canonical.searchParams.set("from", context.selection.from);
         canonical.searchParams.set("to", context.selection.to);
+        if (context.virtualReviewUrl) {
+            canonical.searchParams.set("virtual-review-url", context.virtualReviewUrl);
+        }
         const currentCanonical = `${url.pathname}${url.search}`;
         if (currentCanonical !== `${canonical.pathname}${canonical.search}`) {
             response.statusCode = 302;

@@ -12,7 +12,7 @@ test("injectReviewUi provides the same escaped client-data boundary to every rev
     const result = injectReviewUi({
         html: "<!doctype html><html><head><title>Review</title></head><body></body></html>",
         fragment: '<style id="local-mr-review-ui"></style>',
-        versionData: { source: "real", unsafe: "</script><b>&" },
+        versionData: { source: "virtual", unsafe: "</script><b>&" },
     });
     assert.match(result, /id="local-mr-version-data"/);
     assert.match(result, /id="local-mr-review-ui"/);

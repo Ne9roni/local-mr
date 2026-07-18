@@ -74,7 +74,7 @@ else
     stage=$(mktemp -d "$share_parent/.local-mr-stage.XXXXXXXX")
     cleanup() { rm -rf "$stage"; }
     trap cleanup EXIT
-    mkdir -p "$stage/src"
+    mkdir -p "$stage/src" "$stage/skills"
     install -m 0644 \
         "$repo_root/package.json" \
         "$repo_root/package-lock.json" \
@@ -82,6 +82,7 @@ else
         "$repo_root/THIRD_PARTY_NOTICES.md" \
         "$stage/"
     install -m 0644 "$repo_root"/src/* "$stage/src/"
+    cp -R "$repo_root"/skills/. "$stage/skills/"
     sha256sum "$repo_root/bin/local-mr" | cut -d' ' -f1 > "$stage/.command-sha256"
     (cd "$stage" && npm ci --omit=dev)
 

@@ -44,6 +44,8 @@ try {
     fs.writeFileSync(path.join(repoRoot, "empty.txt"), "first line\n");
     fs.writeFileSync(path.join(repoRoot, "added.txt"), "added\n");
     fs.rmSync(path.join(repoRoot, "deleted.txt"));
+    git(["add", "-A"]);
+    git(["commit", "-m", "change context expansion fixture"]);
 
     const output = execFileSync(localMr, ["main", "--no-open", "--light", `--${layout}`], {
         cwd: repoRoot,

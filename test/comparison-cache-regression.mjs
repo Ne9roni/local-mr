@@ -42,6 +42,10 @@ try {
     git(["add", "example.txt"]);
     git(["commit", "-m", "base"]);
     git(["switch", "-c", "feature/comparison-cache"]);
+    fs.writeFileSync(path.join(repoRoot, "example.txt"), "base\ncommitted\n");
+    git(["add", "example.txt"]);
+    git(["commit", "-m", "seed committed comparison"]);
+    const committedSha = git(["rev-parse", "HEAD"]);
     fs.writeFileSync(path.join(repoRoot, "example.txt"), "base\none\n");
 
     const output = execFileSync(localMr, ["main", "--no-open", "--light"], {
@@ -56,7 +60,13 @@ try {
     });
     reviewUrl = output.match(/^Review: (.+)$/m)?.[1] || "";
     if (!reviewUrl) throw new Error(`local-mr did not print a review URL:\n${output}`);
+    const worktreeReview = new URL(reviewUrl);
+    worktreeReview.searchParams.set("mode", "range");
+    worktreeReview.searchParams.set("from", committedSha);
+    worktreeReview.searchParams.set("to", "worktree");
+    reviewUrl = worktreeReview.href;
 
+    const worktreeCold = await readReview();
     const cached = await readReview();
     const cachedAgain = await readReview();
 
@@ -76,6 +86,9 @@ try {
     const newHeadReviewAgain = await readReview();
     const newHeadCode = diffCodeText(newHeadReview.html);
     const checks = {
+        "manual worktree selection has an independent cold cache key": worktreeCold.modelCache === "hit"
+            && worktreeCold.patchCache === "miss"
+            && worktreeCold.pageCache === "miss",
         "repeated reviews reuse model patch and rendered page": cached.modelCache === "hit"
             && cached.patchCache === "hit"
             && cached.pageCache === "hit"
@@ -99,6 +112,11 @@ try {
             && newHeadReviewAgain.pageCache === "hit",
     };
     console.log(JSON.stringify({
+        worktreeCold: {
+            modelCache: worktreeCold.modelCache,
+            patchCache: worktreeCold.patchCache,
+            pageCache: worktreeCold.pageCache,
+        },
         cached: {
             modelCache: cached.modelCache,
             patchCache: cached.patchCache,

@@ -49,6 +49,8 @@ try {
     git(["commit", "-m", "base"]);
     git(["switch", "-c", "feature/read-state"]);
     fs.writeFileSync(path.join(repoRoot, "README.md"), "# Fixture\n\nChanged.\n");
+    git(["add", "README.md"]);
+    git(["commit", "-m", "change read state fixture"]);
 
     const firstUrl = runLocalMr("--dark", "dark.html");
     const firstReview = await readReview(firstUrl);

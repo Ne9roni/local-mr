@@ -13,6 +13,9 @@ const uninstallScript = path.join(projectRoot, "scripts", "uninstall.sh");
 const commandPath = path.join(prefix, "bin", "local-mr");
 const runtimePath = path.join(prefix, "share", "local-mr");
 const alternateCheckout = path.join(temporaryRoot, "alternate-checkout");
+const codexHome = path.join(temporaryRoot, "codex-home");
+const bundledSkill = path.join("skills", "local-mr-virtual-commits");
+const bundledSkillText = fs.readFileSync(path.join(projectRoot, bundledSkill, "SKILL.md"), "utf8");
 
 const run = (script, arguments_ = []) => execFileSync("bash", [script, ...arguments_], {
     cwd: projectRoot,
@@ -22,9 +25,42 @@ const run = (script, arguments_ = []) => execFileSync("bash", [script, ...argume
 });
 
 try {
+    const packReport = JSON.parse(execFileSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], {
+        cwd: projectRoot,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+    }));
+    const packedFiles = new Set(packReport[0]?.files?.map((entry) => entry.path));
+    const packageChecks = {
+        "npm package includes the virtual-commit CLI": packedFiles.has("src/virtual-review-cli.mjs"),
+        "npm package includes the virtual review server": packedFiles.has("src/virtual-review-server.mjs"),
+        "npm package includes the shared diff workspace": packedFiles.has("src/review-ui.html"),
+        "npm package includes the official Skill": packedFiles.has(`${bundledSkill}/SKILL.md`),
+        "npm package includes the Skill agent metadata": packedFiles.has(`${bundledSkill}/agents/openai.yaml`),
+        "npm package includes the Skill protocol": packedFiles.has(`${bundledSkill}/references/protocol.md`),
+        "official Skill offers both review depths": bundledSkillText.includes("**Overview:**")
+            && bundledSkillText.includes("**Deep review:**")
+            && bundledSkillText.includes("Treat them as independent choices"),
+    };
+    if (Object.values(packageChecks).some((passed) => !passed)) {
+        throw new Error(`Package regression failed: ${JSON.stringify(packageChecks)}`);
+    }
+
     const copyOutput = run(installScript);
     const receipt = fs.readFileSync(path.join(runtimePath, ".command-sha256"), "utf8").trim();
     const help = execFileSync(commandPath, ["--help"], { encoding: "utf8" });
+    const virtualHelp = execFileSync(commandPath, ["virtual-commit", "help"], { encoding: "utf8" });
+    const skillInstall = JSON.parse(execFileSync(
+        commandPath,
+        ["virtual-commit", "install-skill", "codex"],
+        {
+            cwd: projectRoot,
+            env: { ...environment, CODEX_HOME: codexHome },
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "pipe"],
+        },
+    ));
+    const installedSkill = path.join(codexHome, bundledSkill);
     const copiedRuntime = fs.realpathSync(runtimePath);
     const copyChecks = {
         "copy install reports its mode": copyOutput.includes("copy mode"),
@@ -34,6 +70,22 @@ try {
             path.join(runtimePath, "LICENSE"),
         ) && fs.existsSync(path.join(runtimePath, "THIRD_PARTY_NOTICES.md")),
         "installed command resolves its copied runtime": help.includes("Usage: local-mr"),
+        "installed command exposes virtual-commit help": virtualHelp.includes(
+            "Usage: local-mr virtual-commit <command> [options]",
+        ),
+        "copied runtime includes the shared diff workspace": fs.existsSync(
+            path.join(runtimePath, "src", "review-ui.html"),
+        ),
+        "copied runtime includes the official Skill": fs.existsSync(
+            path.join(runtimePath, bundledSkill, "SKILL.md"),
+        ),
+        "copied runtime includes complete Skill support files": fs.existsSync(
+            path.join(runtimePath, bundledSkill, "agents", "openai.yaml"),
+        ) && fs.existsSync(path.join(runtimePath, bundledSkill, "references", "protocol.md")),
+        "copied CLI explicitly installs the official Skill": skillInstall.ok === true
+            && skillInstall.skill === "local-mr-virtual-commits"
+            && skillInstall.destination === installedSkill
+            && fs.existsSync(path.join(installedSkill, "SKILL.md")),
     };
     if (Object.values(copyChecks).some((passed) => !passed)) {
         throw new Error(`Copy install regression failed: ${JSON.stringify(copyChecks)}`);
@@ -68,7 +120,7 @@ try {
         throw new Error(`Uninstall regression failed: ${JSON.stringify(cleanupChecks)}`);
     }
 
-    console.log(JSON.stringify({ copyChecks, linkChecks, cleanupChecks }, null, 2));
+    console.log(JSON.stringify({ packageChecks, copyChecks, linkChecks, cleanupChecks }, null, 2));
 } finally {
     fs.rmSync(temporaryRoot, { recursive: true, force: true });
 }

@@ -8,6 +8,13 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 const emptyTreeSha = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 const maximumPreviewBytes = 2 * 1024 * 1024;
+const comparisonDiffOptions = [
+    "--binary",
+    "--full-index",
+    "--find-renames",
+    "--no-ext-diff",
+    "--no-textconv",
+];
 
 const hashParts = (...parts) => {
     const hash = crypto.createHash("sha256");
@@ -32,14 +39,6 @@ const git = async (repoRoot, args, options = {}) => (
     await gitRaw(repoRoot, args, options)
 ).trimEnd();
 
-const tryGit = async (repoRoot, args) => {
-    try {
-        return await git(repoRoot, args);
-    } catch {
-        return "";
-    }
-};
-
 const parseRecords = (text, fields) => text
     .split("\u001e")
     .map((record) => record.replace(/^\n+|\n+$/g, ""))
@@ -63,21 +62,6 @@ const formatDate = (value) => {
     }).formatToParts(date);
     const part = (type) => parts.find((entry) => entry.type === type)?.value || "";
     return `${part("year")}.${part("month")}.${part("day")} ${part("hour")}:${part("minute")}`;
-};
-
-const isAncestor = async (repoRoot, ancestor, descendant) => {
-    try {
-        await git(repoRoot, ["merge-base", "--is-ancestor", ancestor, descendant]);
-        return true;
-    } catch {
-        return false;
-    }
-};
-
-const commitCount = async (repoRoot, fromSha, toSha) => {
-    if (fromSha === toSha) return 0;
-    const value = await tryGit(repoRoot, ["rev-list", "--count", `${fromSha}..${toSha}`]);
-    return Number.parseInt(value, 10) || 0;
 };
 
 const statusPathRecords = (status) => {
@@ -128,7 +112,33 @@ const fileStateFingerprint = async (repoRoot, status) => {
     return hash.digest("hex");
 };
 
-export const inspectRepositoryState = async ({ repoRoot, targetRef }) => {
+export const inspectRepositoryState = async ({ repoRoot, targetRef, frozen = null }) => {
+    if (frozen) {
+        const values = [frozen.baseSha, frozen.headSha, frozen.targetSha, frozen.branchName];
+        if (values.some((value) => typeof value !== "string" || value.length === 0)) {
+            throw new Error("A frozen comparison requires base, head, target, and branch values");
+        }
+        const [baseSha, headSha, targetSha] = await Promise.all([
+            git(repoRoot, ["rev-parse", `${frozen.baseSha}^{commit}`]),
+            git(repoRoot, ["rev-parse", `${frozen.headSha}^{commit}`]),
+            git(repoRoot, ["rev-parse", `${frozen.targetSha}^{commit}`]),
+        ]);
+        const mergeBaseSha = await git(repoRoot, ["merge-base", headSha, targetSha]);
+        if (baseSha !== mergeBaseSha) {
+            throw new Error("The frozen comparison base is not the merge base of its head and target");
+        }
+        return {
+            branchName: frozen.branchName,
+            headSha,
+            targetSha,
+            baseSha,
+            dirty: false,
+            modelKey: hashParts("frozen", frozen.branchName, baseSha, headSha, targetSha),
+            worktreeKey: hashParts("frozen-worktree", baseSha, headSha, targetSha),
+            frozen: true,
+        };
+    }
+
     const status = await gitRaw(repoRoot, [
         "status",
         "--porcelain=v2",
@@ -142,10 +152,8 @@ export const inspectRepositoryState = async ({ repoRoot, targetRef }) => {
         ?.slice(name.length + 3) || "";
     const headSha = headerValue("branch.oid");
     const branchHead = headerValue("branch.head");
-    const upstream = headerValue("branch.upstream");
-    const [targetSha, upstreamSha, worktreeKey] = await Promise.all([
+    const [targetSha, worktreeKey] = await Promise.all([
         git(repoRoot, ["rev-parse", `${targetRef}^{commit}`]),
-        upstream ? tryGit(repoRoot, ["rev-parse", `${upstream}^{commit}`]) : "",
         fileStateFingerprint(repoRoot, status),
     ]);
     const dirty = records.some((record) => !record.startsWith("# "));
@@ -156,22 +164,21 @@ export const inspectRepositoryState = async ({ repoRoot, targetRef }) => {
         branchName,
         headSha,
         targetSha,
-        upstream,
-        upstreamSha,
         dirty,
-        modelKey: hashParts(branchName, headSha, targetSha, upstream, upstreamSha, dirty),
+        modelKey: hashParts(branchName, headSha, targetSha, dirty),
         worktreeKey,
     };
 };
 
-const collectCommits = async (repoRoot, baseSha) => {
+const collectCommits = async (repoRoot, baseSha, headSha) => {
     const output = await git(repoRoot, [
         "log",
         "--reverse",
-        "--format=%H%x00%P%x00%aI%x00%an%x00%s%x1e",
-        `${baseSha}..HEAD`,
+        "--first-parent",
+        "--format=%H%x00%P%x00%aI%x00%an%x00%s%x00%b%x1e",
+        `${baseSha}..${headSha}`,
     ]);
-    return parseRecords(output, ["sha", "parents", "authoredAt", "author", "subject"])
+    return parseRecords(output, ["sha", "parents", "authoredAt", "author", "subject", "body"])
         .map((commit) => ({
             ...commit,
             shortSha: commit.sha.slice(0, 8),
@@ -180,100 +187,11 @@ const collectCommits = async (repoRoot, baseSha) => {
         }));
 };
 
-const reflogDate = (selector) => selector.match(/@\{(.+)\}$/)?.[1] || "";
-
-const collectPushRecords = async ({ repoRoot, upstream, baseSha, commits }) => {
-    if (!upstream) return [];
-    const output = await tryGit(repoRoot, [
-        "reflog",
-        "show",
-        "--date=iso-strict",
-        "--format=%H%x00%gD%x00%gs%x1e",
-        upstream,
-    ]);
-    const seen = new Set();
-    const candidates = [];
-    for (const record of parseRecords(output, ["sha", "selector", "message"]).reverse()) {
-        if (record.message.trim().toLowerCase() !== "update by push") continue;
-        if (!record.sha || seen.has(record.sha) || record.sha === baseSha) continue;
-        seen.add(record.sha);
-        candidates.push(record);
-    }
-    const ancestry = await Promise.all(candidates.map((record) => (
-        isAncestor(repoRoot, baseSha, record.sha)
-    )));
-    const commitsBySha = new Map(commits.map((commit) => [commit.sha, commit]));
-    return candidates.flatMap((record, index) => {
-        if (!ancestry[index]) return [];
-        const matchingCommit = commitsBySha.get(record.sha);
-        return [{
-            sha: record.sha,
-            pushedAt: reflogDate(record.selector) || matchingCommit?.authoredAt || "",
-            message: record.message,
-        }];
-    });
-};
-
 export const buildVersionModel = async ({ repoRoot, targetRef, repositoryState }) => {
     const state = repositoryState || await inspectRepositoryState({ repoRoot, targetRef });
-    const { branchName, headSha, upstream, dirty } = state;
-    const baseSha = await git(repoRoot, ["merge-base", headSha, state.targetSha]);
-    const committedChanges = await collectCommits(repoRoot, baseSha);
-    const pushRecords = await collectPushRecords({
-        repoRoot,
-        upstream,
-        baseSha,
-        commits: committedChanges,
-    });
-
-    const lastPushSha = pushRecords.at(-1)?.sha || baseSha;
-    const versionSeeds = pushRecords.map((record, index) => ({
-        kind: "push",
-        value: `push:${record.sha}`,
-        sha: record.sha,
-        fromSha: index === 0 ? baseSha : pushRecords[index - 1].sha,
-        date: record.pushedAt,
-        dateLabel: formatDate(record.pushedAt),
-    }));
-    if (headSha !== lastPushSha) {
-        versionSeeds.push({
-            kind: "local",
-            value: `local:${headSha}`,
-            sha: headSha,
-            fromSha: lastPushSha,
-            date: new Date().toISOString(),
-            dateLabel: "Current local HEAD",
-        });
-    }
-    const commitCounts = await Promise.all(versionSeeds.map((version) => (
-        commitCount(repoRoot, version.fromSha, version.sha)
-    )));
-    const committedVersions = versionSeeds.map((version, index) => {
-        const { fromSha, ...publicVersion } = version;
-        return {
-            ...publicVersion,
-            commitCount: commitCounts[index],
-        };
-    });
-
-    committedVersions.forEach((version, index) => {
-        const latest = index === committedVersions.length - 1;
-        version.latest = latest;
-        version.label = `Version ${index + 1}${latest ? " (latest)" : ""}`;
-        const commitsText = `${version.commitCount} commit${version.commitCount === 1 ? "" : "s"}`;
-        version.description = `${commitsText}${version.dateLabel ? `, ${version.dateLabel}` : ""}`;
-    });
-
-    const worktreeVersion = dirty ? {
-        kind: "worktree",
-        virtual: true,
-        value: "worktree",
-        sha: headSha,
-        commitCount: 0,
-        label: "Uncommitted changes",
-        description: "Staged, unstaged, and untracked files",
-        latest: false,
-    } : null;
+    const { branchName, headSha, dirty } = state;
+    const baseSha = state.baseSha || await git(repoRoot, ["merge-base", headSha, state.targetSha]);
+    const committedChanges = await collectCommits(repoRoot, baseSha, headSha);
     const commits = dirty ? [
         ...committedChanges,
         {
@@ -285,57 +203,150 @@ export const buildVersionModel = async ({ repoRoot, targetRef, repositoryState }
             authoredAt: new Date().toISOString(),
             author: "Local worktree",
             subject: "Uncommitted changes",
+            body: "Staged, unstaged, and untracked files",
             dateLabel: "Current worktree",
         },
     ] : committedChanges;
 
-    const pushVersions = [
-        {
-            kind: "base",
-            value: "base",
-            sha: baseSha,
-            label: "Base version",
-            description: `Same as ${targetRef}`,
-            latest: committedVersions.length === 0,
-        },
-        ...committedVersions,
-        ...(worktreeVersion ? [worktreeVersion] : []),
-    ];
-    const defaultTo = pushVersions.at(-1).value;
+    const defaultSelection = committedChanges.length > 0 ? {
+        mode: "range",
+        from: committedChanges[0].sha,
+        to: committedChanges.at(-1).sha,
+    } : {
+        mode: "range",
+        from: "base",
+        to: "base",
+    };
     return {
         repoRoot,
         branchName,
         targetRef,
         headSha,
-        upstream,
         dirty,
         base: { sha: baseSha, shortSha: baseSha.slice(0, 8), label: "Base version" },
         commits,
-        pushVersions,
-        defaultSelection: { mode: "push", from: "base", to: defaultTo },
+        defaultSelection,
     };
 };
 
-export const normalizeSelection = (model, selection = {}) => {
-    if (selection.mode === "commits" && model.commits.length > 0) {
-        const fromIndex = model.commits.findIndex((commit) => commit.sha === selection.from);
-        const toIndex = model.commits.findIndex((commit) => commit.sha === selection.to);
-        if (fromIndex >= 0 && toIndex >= fromIndex) {
-            return { mode: "commits", from: model.commits[fromIndex].sha, to: model.commits[toIndex].sha };
+const invalidSelection = (message) => {
+    const error = new Error(message);
+    error.code = "INVALID_SELECTION";
+    throw error;
+};
+
+const commitIndex = (model, value) => model.commits.findIndex((commit) => commit.sha === value);
+
+const canonicalCommitSelection = (model, selection) => {
+    if (selection.mode === "range" && selection.from === "base" && selection.to === "base") {
+        if (model.commits.some((commit) => !commit.virtual)) {
+            return invalidSelection("An empty range is only valid when there are no committed changes");
+        }
+        return { mode: "range", from: "base", to: "base" };
+    }
+    const fromIndex = commitIndex(model, selection.from);
+    const toIndex = commitIndex(model, selection.to);
+    if (fromIndex < 0) return invalidSelection(`Unknown commit --from endpoint: ${selection.from}`);
+    if (toIndex < 0) return invalidSelection(`Unknown commit --to endpoint: ${selection.to}`);
+    if (selection.mode === "single") {
+        if (fromIndex !== toIndex) {
+            return invalidSelection("Single commit mode requires identical --from and --to endpoints");
         }
         return {
-            mode: "commits",
-            from: model.commits[0].sha,
-            to: model.commits.at(-1).sha,
+            mode: "single",
+            from: model.commits[fromIndex].sha,
+            to: model.commits[fromIndex].sha,
         };
     }
+    if (toIndex < fromIndex) return invalidSelection("Commit range --to must not precede --from");
+    return {
+        mode: "range",
+        from: model.commits[fromIndex].sha,
+        to: model.commits[toIndex].sha,
+    };
+};
 
-    const fromIndex = model.pushVersions.findIndex((version) => version.value === selection.from);
-    const toIndex = model.pushVersions.findIndex((version) => version.value === selection.to);
-    if (fromIndex >= 0 && toIndex > fromIndex) {
-        return { mode: "push", from: model.pushVersions[fromIndex].value, to: model.pushVersions[toIndex].value };
+const legacyEndpointSha = (value) => {
+    if (value === "base" || value === "worktree") return value;
+    return value?.replace(/^(?:push|local):/, "") || "";
+};
+
+const canonicalLegacyPushSelection = (model, selection) => {
+    const fromValue = legacyEndpointSha(selection.from);
+    const toValue = legacyEndpointSha(selection.to);
+    const fromIndex = fromValue === "base" ? 0 : commitIndex(model, fromValue) + 1;
+    const toIndex = toValue === "base" ? -1 : commitIndex(model, toValue);
+    if (fromIndex < 0 || (fromValue !== "base" && fromIndex === 0)) {
+        return invalidSelection(`Unknown legacy push --from endpoint: ${selection.from}`);
     }
-    return { ...model.defaultSelection };
+    if (toIndex < 0) return invalidSelection(`Unknown legacy push --to endpoint: ${selection.to}`);
+    if (toIndex < fromIndex) return invalidSelection("Legacy push --to must follow --from");
+    return canonicalCommitSelection(model, {
+        mode: "range",
+        from: model.commits[fromIndex].sha,
+        to: model.commits[toIndex].sha,
+    });
+};
+
+export const validateSelection = (model, selection) => {
+    if (!selection || typeof selection !== "object" || Array.isArray(selection)) {
+        return invalidSelection("An explicit comparison selection must be an object");
+    }
+    if (!["single", "range", "commits", "push"].includes(selection.mode)) {
+        return invalidSelection(`Unsupported comparison mode: ${selection.mode || "(empty)"}`);
+    }
+    if (typeof selection.from !== "string" || selection.from.length === 0) {
+        return invalidSelection("The comparison --from endpoint must be a non-empty string");
+    }
+    if (typeof selection.to !== "string" || selection.to.length === 0) {
+        return invalidSelection("The comparison --to endpoint must be a non-empty string");
+    }
+
+    if (selection.mode === "push") return canonicalLegacyPushSelection(model, selection);
+    const mode = selection.mode === "commits"
+        ? selection.from === selection.to ? "single" : "range"
+        : selection.mode;
+    return canonicalCommitSelection(model, { ...selection, mode });
+};
+
+export const normalizeSelection = (model, selection = {}) => {
+    try {
+        return validateSelection(model, selection);
+    } catch {
+        return { ...model.defaultSelection };
+    }
+};
+
+const comparisonBaseRevision = (model, selection) => {
+    const normalizedSelection = normalizeSelection(model, selection);
+    if (normalizedSelection.from === "base") return model.base.sha;
+    const fromIndex = commitIndex(model, normalizedSelection.from);
+    const commit = model.commits[fromIndex];
+    if (!commit?.parentSha) throw new Error("Selected comparison base is unavailable");
+    if (normalizedSelection.mode === "range" && fromIndex === 0) return model.base.sha;
+    return commit.parentSha;
+};
+
+export const resolveComparisonEndpoints = (model, selection = {}, { strict = false } = {}) => {
+    const normalized = strict ? validateSelection(model, selection) : normalizeSelection(model, selection);
+    if (normalized.from === "base" && normalized.to === "base") {
+        return {
+            selection: normalized,
+            from: { kind: "revision", sha: model.base.sha },
+            to: { kind: "revision", sha: model.base.sha },
+        };
+    }
+    const toCommit = model.commits.find((commit) => commit.sha === normalized.to);
+    if (!toCommit) {
+        throw new Error("Selected comparison endpoints are unavailable");
+    }
+    return {
+        selection: normalized,
+        from: { kind: "revision", sha: comparisonBaseRevision(model, normalized) },
+        to: toCommit.kind === "worktree"
+            ? { kind: "worktree", sha: model.headSha }
+            : { kind: "revision", sha: toCommit.sha },
+    };
 };
 
 const snapshotWorktreePatch = async (repoRoot, fromSha) => {
@@ -345,7 +356,13 @@ const snapshotWorktreePatch = async (repoRoot, fromSha) => {
     try {
         await git(repoRoot, ["read-tree", "HEAD"], { env });
         await git(repoRoot, ["add", "-A", "--", "."], { env });
-        return await git(repoRoot, ["diff", "--cached", "--find-renames", fromSha, "--"], { env });
+        return await gitRaw(repoRoot, [
+            "diff",
+            "--cached",
+            ...comparisonDiffOptions,
+            fromSha,
+            "--",
+        ], { env });
     } finally {
         await fs.rm(tempDirectory, { recursive: true, force: true });
     }
@@ -353,21 +370,19 @@ const snapshotWorktreePatch = async (repoRoot, fromSha) => {
 
 export const buildComparisonPatch = async ({ repoRoot, model, selection }) => {
     const normalized = normalizeSelection(model, selection);
-    if (normalized.mode === "commits") {
-        const fromCommit = model.commits.find((commit) => commit.sha === normalized.from);
-        const toCommit = model.commits.find((commit) => commit.sha === normalized.to);
-        if (toCommit.kind === "worktree") {
-            return snapshotWorktreePatch(repoRoot, fromCommit.parentSha);
-        }
-        return git(repoRoot, ["diff", "--find-renames", fromCommit.parentSha, toCommit.sha, "--"]);
+    if (normalized.from === "base" && normalized.to === "base") return "";
+    const toCommit = model.commits.find((commit) => commit.sha === normalized.to);
+    const fromSha = comparisonBaseRevision(model, normalized);
+    if (toCommit.kind === "worktree") {
+        return snapshotWorktreePatch(repoRoot, fromSha);
     }
-
-    const fromVersion = model.pushVersions.find((version) => version.value === normalized.from);
-    const toVersion = model.pushVersions.find((version) => version.value === normalized.to);
-    if (toVersion.kind === "worktree") {
-        return snapshotWorktreePatch(repoRoot, fromVersion.sha);
-    }
-    return git(repoRoot, ["diff", "--find-renames", fromVersion.sha, toVersion.sha, "--"]);
+    return gitRaw(repoRoot, [
+        "diff",
+        ...comparisonDiffOptions,
+        fromSha,
+        toCommit.sha,
+        "--",
+    ]);
 };
 
 const normalizeRepositoryPath = (filePath, label = "repository") => {
@@ -384,18 +399,6 @@ const normalizeRepositoryPath = (filePath, label = "repository") => {
         throw new Error(`Invalid ${label} path`);
     }
     return normalized;
-};
-
-const comparisonBaseRevision = (model, selection) => {
-    const normalizedSelection = normalizeSelection(model, selection);
-    if (normalizedSelection.mode === "commits") {
-        const commit = model.commits.find((candidate) => candidate.sha === normalizedSelection.from);
-        if (!commit?.parentSha) throw new Error("Selected comparison base is unavailable");
-        return commit.parentSha;
-    }
-    const version = model.pushVersions.find((candidate) => candidate.value === normalizedSelection.from);
-    if (!version?.sha) throw new Error("Selected comparison base is unavailable");
-    return version.sha;
 };
 
 export const buildFileContext = async ({ repoRoot, model, selection, filePath, start, end }) => {
@@ -469,21 +472,11 @@ const readWorktreeFile = async (repoRoot, normalizedPath) => {
 export const buildFilePreview = async ({ repoRoot, model, selection, filePath }) => {
     const normalizedPath = normalizePreviewPath(filePath);
     const normalizedSelection = normalizeSelection(model, selection);
-    let content;
-
-    if (normalizedSelection.mode === "commits") {
-        const commit = model.commits.find((candidate) => candidate.sha === normalizedSelection.to);
-        content = commit.kind === "worktree"
-            ? await readWorktreeFile(repoRoot, normalizedPath)
-            : await readGitBlob(repoRoot, commit.sha, normalizedPath);
-    } else {
-        const version = model.pushVersions.find((candidate) => candidate.value === normalizedSelection.to);
-        if (version.kind === "worktree") {
-            content = await readWorktreeFile(repoRoot, normalizedPath);
-        } else {
-            content = await readGitBlob(repoRoot, version.sha, normalizedPath);
-        }
-    }
+    const commit = model.commits.find((candidate) => candidate.sha === normalizedSelection.to);
+    if (!commit) throw new Error("Selected comparison target is unavailable");
+    const content = commit.kind === "worktree"
+        ? await readWorktreeFile(repoRoot, normalizedPath)
+        : await readGitBlob(repoRoot, commit.sha, normalizedPath);
 
     return {
         path: normalizedPath,

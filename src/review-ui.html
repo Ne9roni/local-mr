@@ -5,6 +5,7 @@
       }
 
       body {
+        --lm-content-top: 54px;
         --lm-accent: #4991e0;
         --lm-accent-soft: #eaf5ff;
         --lm-bg: #f7f8fa;
@@ -20,8 +21,19 @@
         --lm-green-soft: #d8fed8;
         --lm-red: #f36479;
         --lm-red-soft: #ffebed;
+        --lm-syntax-text: #24292e;
+        --lm-syntax-keyword: #cf222e;
+        --lm-syntax-entity: #8250df;
+        --lm-syntax-constant: #0550ae;
+        --lm-syntax-string: #0a3069;
+        --lm-syntax-variable: #953800;
+        --lm-syntax-comment: #6e7781;
+        --lm-syntax-tag: #116329;
+        --lm-syntax-bullet: #3b2300;
         --d2h-bg-color: #ffffff;
         --d2h-border-color: #dfe3e8;
+        --d2h-empty-placeholder-bg-color: #f1f3f5;
+        --d2h-empty-placeholder-border-color: #e1e5e9;
         --d2h-file-header-bg-color: #f8f9fb;
         --d2h-file-header-border-color: #dfe3e8;
         --d2h-line-border-color: #edf0f3;
@@ -34,9 +46,11 @@
         --d2h-del-border-color: #f6ccd2;
         --d2h-del-highlight-bg-color: #f7c5cc;
         box-sizing: border-box;
+        display: flex;
         height: 100%;
         margin: 0 !important;
         overflow: hidden;
+        flex-direction: column;
         background: var(--lm-bg) !important;
         color: var(--lm-text);
         font-family: "Segoe UI Variable Text", "Segoe UI", Arial, sans-serif !important;
@@ -45,6 +59,8 @@
 
       html:not(.local-mr-ready) body > h1,
       html:not(.local-mr-ready) body > .local-mr-version-bar,
+      html:not(.local-mr-ready) body > .local-mr-review-source-warning,
+      html:not(.local-mr-ready) body > .local-mr-commit-message,
       html:not(.local-mr-ready) #diff {
         visibility: hidden;
       }
@@ -77,8 +93,21 @@
         --lm-green-soft: #123522;
         --lm-red: #ff7b83;
         --lm-red-soft: #3c1d23;
+        --lm-syntax-text: #c9d1d9;
+        --lm-syntax-keyword: #ff7b72;
+        --lm-syntax-entity: #d2a8ff;
+        --lm-syntax-constant: #79c0ff;
+        --lm-syntax-string: #a5d6ff;
+        --lm-syntax-variable: #ffa657;
+        --lm-syntax-comment: #8b949e;
+        --lm-syntax-tag: #7ee787;
+        --lm-syntax-bullet: #f2cc60;
         --d2h-dark-bg-color: #111820;
         --d2h-dark-border-color: #2b3440;
+        --d2h-dark-empty-placeholder-bg-color: rgba(110, 118, 129, 0.1);
+        --d2h-dark-empty-placeholder-border-color: #2b3440;
+        --d2h-empty-placeholder-bg-color: rgba(110, 118, 129, 0.1);
+        --d2h-empty-placeholder-border-color: #2b3440;
         --d2h-dark-file-header-bg-color: #18212b;
         --d2h-dark-file-header-border-color: #2b3440;
         --d2h-dark-line-border-color: #222c37;
@@ -107,8 +136,21 @@
           --lm-green-soft: #123522;
           --lm-red: #ff7b83;
           --lm-red-soft: #3c1d23;
+          --lm-syntax-text: #c9d1d9;
+          --lm-syntax-keyword: #ff7b72;
+          --lm-syntax-entity: #d2a8ff;
+          --lm-syntax-constant: #79c0ff;
+          --lm-syntax-string: #a5d6ff;
+          --lm-syntax-variable: #ffa657;
+          --lm-syntax-comment: #8b949e;
+          --lm-syntax-tag: #7ee787;
+          --lm-syntax-bullet: #f2cc60;
           --d2h-dark-bg-color: #111820;
           --d2h-dark-border-color: #2b3440;
+          --d2h-dark-empty-placeholder-bg-color: rgba(110, 118, 129, 0.1);
+          --d2h-dark-empty-placeholder-border-color: #2b3440;
+          --d2h-empty-placeholder-bg-color: rgba(110, 118, 129, 0.1);
+          --d2h-empty-placeholder-border-color: #2b3440;
           --d2h-dark-file-header-bg-color: #18212b;
           --d2h-dark-file-header-border-color: #2b3440;
           --d2h-dark-line-border-color: #222c37;
@@ -132,6 +174,7 @@
         z-index: 4;
         display: flex;
         height: 54px;
+        flex: 0 0 54px;
         margin: 0;
         padding: 0 18px;
         align-items: center;
@@ -144,6 +187,52 @@
         font-weight: 500;
         line-height: 1;
         white-space: nowrap;
+      }
+
+      .local-mr-mobile-files-toggle {
+        display: none;
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        flex: 0 0 34px;
+        place-items: center;
+        border: 1px solid var(--lm-border);
+        border-radius: 5px;
+        background: var(--lm-panel);
+        color: var(--lm-text);
+        cursor: pointer;
+      }
+
+      .local-mr-mobile-files-icon,
+      .local-mr-mobile-files-icon::before,
+      .local-mr-mobile-files-icon::after {
+        width: 13px;
+        height: 1px;
+        background: currentColor;
+        content: "";
+      }
+
+      .local-mr-mobile-files-icon {
+        position: relative;
+        display: block;
+      }
+
+      .local-mr-mobile-files-icon::before,
+      .local-mr-mobile-files-icon::after {
+        position: absolute;
+        left: 0;
+      }
+
+      .local-mr-mobile-files-icon::before {
+        top: -4px;
+      }
+
+      .local-mr-mobile-files-icon::after {
+        top: 4px;
+      }
+
+      .local-mr-mobile-sidebar-backdrop {
+        display: none;
       }
 
       .local-mr-brand {
@@ -177,11 +266,13 @@
       .local-mr-summary {
         display: flex;
         margin-left: auto;
+        flex: 0 0 auto;
         align-items: center;
-        gap: 12px;
+        gap: 7px;
         color: var(--lm-muted);
-        font-size: 12px;
+        font-size: 11px;
         font-variant-numeric: tabular-nums;
+        white-space: nowrap;
       }
 
       .local-mr-summary-added {
@@ -197,12 +288,226 @@
         z-index: 5;
         display: flex;
         height: 50px;
+        flex: 0 0 50px;
         padding: 8px 12px;
         align-items: center;
         border-bottom: 1px solid var(--lm-border);
         background: var(--lm-panel);
         color: var(--lm-text);
         font-size: 14px;
+      }
+
+      .local-mr-review-source-warning {
+        position: relative;
+        z-index: 4;
+        display: flex;
+        min-height: 40px;
+        padding: 8px 18px;
+        align-items: baseline;
+        flex: 0 0 auto;
+        flex-wrap: wrap;
+        gap: 3px 6px;
+        border-bottom: 1px solid color-mix(in srgb, var(--lm-red) 34%, var(--lm-border));
+        background: color-mix(in srgb, var(--lm-red-soft) 56%, var(--lm-panel));
+        color: var(--lm-text);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .local-mr-review-source-warning strong {
+        color: var(--lm-red);
+        font-weight: 650;
+      }
+
+      .local-mr-review-source-warning code {
+        padding: 1px 4px;
+        border: 1px solid color-mix(in srgb, var(--lm-red) 24%, var(--lm-border));
+        border-radius: 3px;
+        background: color-mix(in srgb, var(--lm-panel) 70%, transparent);
+        color: var(--lm-text);
+        font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+        font-size: 11px;
+      }
+
+      .local-mr-commit-message {
+        position: relative;
+        z-index: 4;
+        display: block;
+        width: 100%;
+        max-height: min(236px, 34dvh);
+        padding: 11px 18px 12px;
+        flex: 0 0 auto;
+        overflow: auto;
+        border-bottom: 1px solid var(--lm-border);
+        background: var(--lm-panel);
+        color: var(--lm-text);
+        font-family: "Segoe UI Variable Text", "Segoe UI", Arial, sans-serif;
+        scrollbar-color: var(--lm-border) transparent;
+        scrollbar-width: thin;
+      }
+
+      .local-mr-commit-message-header {
+        display: flex;
+        min-width: 0;
+        align-items: baseline;
+        gap: 10px;
+      }
+
+      .local-mr-commit-message-label {
+        flex: 0 0 auto;
+        color: var(--lm-accent);
+        font-size: 11px;
+        font-weight: 650;
+      }
+
+      .local-mr-commit-message-meta {
+        min-width: 0;
+        overflow: hidden;
+        color: var(--lm-muted);
+        font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+        font-size: 10px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .local-mr-commit-message-title {
+        margin: 4px 0 0;
+        color: var(--lm-text);
+        font-size: 14px;
+        font-weight: 650;
+        line-height: 1.4;
+      }
+
+      .local-mr-commit-message-body {
+        max-width: 110ch;
+        margin: 3px 0 0;
+        color: var(--lm-text);
+        font-size: 12px;
+        line-height: 1.55;
+        white-space: pre-wrap;
+      }
+
+      .local-mr-commit-review-index {
+        display: grid;
+        margin: 7px 0 0;
+        padding-left: 22px;
+        grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+        column-gap: 28px;
+        row-gap: 3px;
+        color: var(--lm-text);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .local-mr-commit-review-index li {
+        padding-left: 2px;
+      }
+
+      .local-mr-commit-review-index li::marker {
+        color: var(--lm-accent);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .local-mr-commit-message-risk {
+        max-width: 110ch;
+        margin: 7px 0 0;
+        padding-top: 7px;
+        border-top: 1px solid var(--lm-border);
+        color: var(--lm-muted);
+        font-size: 11px;
+        line-height: 1.5;
+      }
+
+      .local-mr-commit-message-risk strong {
+        color: var(--lm-text);
+        font-weight: 650;
+      }
+
+      .local-mr-review-source {
+        display: grid;
+        width: 216px;
+        height: 32px;
+        flex: 0 0 216px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        overflow: hidden;
+        border: 1px solid var(--lm-border);
+        border-radius: 4px;
+        background: var(--lm-panel);
+      }
+
+      .local-mr-review-source-option {
+        display: flex;
+        min-width: 0;
+        border: 0;
+        appearance: none;
+        padding: 0 9px;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        background: transparent;
+        color: var(--lm-muted);
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 30px;
+        text-decoration: none;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .local-mr-review-source-option + .local-mr-review-source-option {
+        border-left: 1px solid var(--lm-border);
+      }
+
+      .local-mr-review-source-option:hover {
+        background: var(--lm-hover);
+        color: var(--lm-text);
+      }
+
+      .local-mr-review-source-option[aria-current="page"] {
+        background: var(--lm-selected);
+        color: var(--lm-accent);
+      }
+
+      .local-mr-review-source-option[aria-disabled="true"] {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .local-mr-review-source-option[aria-disabled="true"]:hover {
+        background: transparent;
+        color: var(--lm-muted);
+      }
+
+      .local-mr-review-source-option[data-review-source-state="stale"] {
+        color: var(--lm-red);
+      }
+
+      .local-mr-review-source-option[data-review-source-state="stale"]:hover,
+      .local-mr-review-source-option[data-review-source-state="stale"][aria-current="page"] {
+        background: var(--lm-red-soft);
+        color: var(--lm-red);
+      }
+
+      .local-mr-source-label-short {
+        display: none;
+      }
+
+      .local-mr-review-source-divider {
+        width: 1px;
+        height: 24px;
+        margin: 0 10px;
+        flex: 0 0 1px;
+        background: var(--lm-border);
+      }
+
+      .local-mr-source-controls {
+        display: flex;
+        min-width: 0;
+        height: 32px;
+        flex: 0 0 auto;
+        align-items: center;
       }
 
       .local-mr-version-control {
@@ -212,15 +517,90 @@
       }
 
       .local-mr-version-mode {
-        width: 110px;
-      }
-
-      .local-mr-push-version {
-        width: 180px;
+        width: 128px;
       }
 
       .local-mr-commit-range {
-        width: 280px;
+        width: 220px;
+      }
+
+      .local-mr-single-commit {
+        width: 300px;
+      }
+
+      .local-mr-virtual-revision {
+        width: 210px;
+        margin-left: 6px;
+      }
+
+      .local-mr-virtual-revision .local-mr-version-menu {
+        right: 0;
+        left: auto;
+        width: 440px;
+      }
+
+      .local-mr-virtual-revision .local-mr-version-option {
+        min-height: 68px;
+      }
+
+      .local-mr-virtual-revision .local-mr-version-option-description {
+        overflow: visible;
+        text-overflow: clip;
+        white-space: normal;
+      }
+
+      .local-mr-source-controls > .local-mr-version-control.local-mr-virtual-revision .local-mr-version-trigger {
+        border-left-width: 1px;
+        border-radius: 4px;
+      }
+
+      .local-mr-virtual-action {
+        display: inline-flex;
+        height: 32px;
+        margin-left: 6px;
+        padding: 0 10px;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        border: 1px solid var(--lm-border);
+        border-radius: 4px;
+        background: var(--lm-panel);
+        color: var(--lm-text);
+        cursor: pointer;
+        font: inherit;
+        font-size: 12px;
+        line-height: 30px;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+
+      .local-mr-virtual-action:hover {
+        border-color: color-mix(in srgb, var(--lm-accent) 40%, var(--lm-border));
+        background: var(--lm-hover);
+      }
+
+      .local-mr-virtual-action[aria-pressed="true"] {
+        border-color: color-mix(in srgb, var(--lm-green) 48%, var(--lm-border));
+        background: color-mix(in srgb, var(--lm-green-soft) 70%, var(--lm-panel));
+        color: color-mix(in srgb, var(--lm-green) 72%, var(--lm-text));
+      }
+
+      .local-mr-virtual-action:disabled {
+        cursor: default;
+        opacity: 0.45;
+      }
+
+      .local-mr-virtual-progress {
+        min-width: 0;
+        margin-left: auto;
+        padding-left: 12px;
+        flex: 0 1 auto;
+        overflow: hidden;
+        color: var(--lm-muted);
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       .local-mr-version-trigger {
@@ -409,7 +789,7 @@
 
       .local-mr-version-loading::after {
         position: fixed;
-        inset: 104px 0 0;
+        inset: var(--lm-content-top) 0 0;
         z-index: 50;
         display: grid;
         place-items: start center;
@@ -423,13 +803,18 @@
 
       #diff {
         display: grid;
-        height: calc(100% - 54px);
+        height: auto;
         min-height: 0;
+        flex: 1 1 auto;
         grid-template-columns: 320px minmax(0, 1fr);
       }
 
+      body.local-mr-has-version-bar {
+        --lm-content-top: 104px;
+      }
+
       body.local-mr-has-version-bar #diff {
-        height: calc(100% - 104px);
+        height: auto;
       }
 
       #diff > .d2h-file-list-wrapper {
@@ -524,6 +909,7 @@
 
       .local-mr-tree .d2h-file-list-line {
         cursor: pointer;
+        scroll-margin-top: 88px;
       }
 
       .local-mr-tree li[hidden] {
@@ -1155,6 +1541,93 @@
         font-variant-ligatures: none;
       }
 
+      .d2h-code-line-ctn.hljs {
+        background: transparent;
+        color: var(--lm-syntax-text);
+      }
+
+      .hljs-doctag,
+      .hljs-keyword,
+      .hljs-meta .hljs-keyword,
+      .hljs-template-tag,
+      .hljs-template-variable,
+      .hljs-type,
+      .hljs-variable.language_ {
+        color: var(--lm-syntax-keyword);
+      }
+
+      .hljs-title,
+      .hljs-title.class_,
+      .hljs-title.class_.inherited__,
+      .hljs-title.function_ {
+        color: var(--lm-syntax-entity);
+      }
+
+      .hljs-attr,
+      .hljs-attribute,
+      .hljs-literal,
+      .hljs-meta,
+      .hljs-number,
+      .hljs-operator,
+      .hljs-variable,
+      .hljs-selector-attr,
+      .hljs-selector-class,
+      .hljs-selector-id,
+      .hljs-section {
+        color: var(--lm-syntax-constant);
+      }
+
+      .hljs-regexp,
+      .hljs-string,
+      .hljs-meta .hljs-string {
+        color: var(--lm-syntax-string);
+      }
+
+      .hljs-built_in,
+      .hljs-symbol {
+        color: var(--lm-syntax-variable);
+      }
+
+      .hljs-comment,
+      .hljs-code,
+      .hljs-formula {
+        color: var(--lm-syntax-comment);
+      }
+
+      .hljs-name,
+      .hljs-quote,
+      .hljs-selector-tag,
+      .hljs-selector-pseudo {
+        color: var(--lm-syntax-tag);
+      }
+
+      .hljs-subst,
+      .hljs-emphasis,
+      .hljs-strong {
+        color: var(--lm-syntax-text);
+      }
+
+      .hljs-section,
+      .hljs-strong {
+        font-weight: 700;
+      }
+
+      .hljs-bullet {
+        color: var(--lm-syntax-bullet);
+      }
+
+      .hljs-emphasis {
+        font-style: italic;
+      }
+
+      .hljs-addition {
+        color: var(--lm-green);
+      }
+
+      .hljs-deletion {
+        color: var(--lm-red);
+      }
+
       .d2h-code-side-linenumber,
       .d2h-code-linenumber {
         color: var(--lm-muted) !important;
@@ -1271,12 +1744,44 @@
       }
 
       @media (max-width: 980px) {
-        .local-mr-push-version {
-          width: 160px;
+        .local-mr-review-source {
+          width: 112px;
+          flex-basis: 112px;
+        }
+
+        .local-mr-review-source-option {
+          padding-right: 4px;
+          padding-left: 4px;
+        }
+
+        .local-mr-source-label-wide {
+          display: none;
+        }
+
+        .local-mr-source-label-short {
+          display: inline;
+        }
+
+        .local-mr-review-source-divider {
+          margin-right: 7px;
+          margin-left: 7px;
         }
 
         .local-mr-commit-range {
+          width: 200px;
+        }
+
+        .local-mr-single-commit {
           width: 240px;
+        }
+
+        .local-mr-virtual-revision {
+          width: 108px;
+        }
+
+        .local-mr-virtual-progress,
+        .local-mr-virtual-action {
+          display: none;
         }
 
         #diff {
@@ -1290,6 +1795,175 @@
         #diff > .d2h-wrapper {
           padding-right: 12px;
           padding-left: 12px;
+        }
+      }
+
+      @media (max-width: 600px) {
+        body > h1 {
+          padding-right: 10px;
+          padding-left: 10px;
+          gap: 8px;
+        }
+
+        .local-mr-commit-message {
+          max-height: min(210px, 32dvh);
+          padding: 9px 10px 10px;
+        }
+
+        .local-mr-review-source-warning {
+          min-height: 0;
+          padding: 8px 10px;
+          font-size: 11.5px;
+        }
+
+        .local-mr-commit-message-header {
+          gap: 7px;
+        }
+
+        .local-mr-commit-message-title {
+          margin-top: 3px;
+          font-size: 13px;
+        }
+
+        .local-mr-commit-message-body,
+        .local-mr-commit-review-index {
+          font-size: 11.5px;
+        }
+
+        .local-mr-commit-review-index {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .local-mr-mobile-files-toggle {
+          display: grid;
+        }
+
+        body.local-mr-files-open .local-mr-mobile-files-toggle {
+          border-color: var(--lm-accent);
+          background: var(--lm-selected);
+          color: var(--lm-accent);
+        }
+
+        .local-mr-version-bar {
+          min-width: 0;
+          padding-right: 10px;
+          padding-left: 10px;
+        }
+
+        .local-mr-review-source {
+          width: 104px;
+          flex-basis: 104px;
+        }
+
+        .local-mr-review-source-divider {
+          margin-right: 5px;
+          margin-left: 5px;
+        }
+
+        .local-mr-source-controls {
+          flex: 1 1 0;
+        }
+
+        .local-mr-version-mode {
+          width: 78px;
+          flex: 0 1 78px;
+        }
+
+        .local-mr-commit-range {
+          width: auto;
+          min-width: 0;
+          flex: 1 1 0;
+        }
+
+        .local-mr-virtual-revision {
+          width: 82px;
+          min-width: 0;
+          flex: 0 1 82px;
+        }
+
+        .local-mr-virtual-progress,
+        .local-mr-virtual-action[data-virtual-action="previous"],
+        .local-mr-virtual-action[data-virtual-action="next"] {
+          display: none;
+        }
+
+        .local-mr-virtual-action {
+          padding-right: 7px;
+          padding-left: 7px;
+        }
+
+        .local-mr-version-arrow {
+          width: 18px;
+          flex-basis: 18px;
+        }
+
+        .local-mr-version-trigger {
+          padding-right: 6px;
+          padding-left: 7px;
+          gap: 4px;
+        }
+
+        .local-mr-version-menu,
+        .local-mr-commit-range .local-mr-version-menu,
+        .local-mr-virtual-revision .local-mr-version-menu {
+          width: min(400px, calc(100vw - 20px));
+        }
+
+        .local-mr-version-mode .local-mr-version-menu {
+          width: 110px;
+        }
+
+        .local-mr-source-controls > .local-mr-version-control:last-child .local-mr-version-menu {
+          right: 0;
+          left: auto;
+        }
+
+        #diff {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        #diff > .d2h-file-list-wrapper {
+          position: fixed;
+          top: var(--lm-content-top);
+          bottom: 0;
+          left: 0;
+          z-index: 31;
+          width: min(326px, calc(100vw - 48px));
+          height: auto;
+          visibility: hidden;
+          border-right: 1px solid var(--lm-border);
+          box-shadow: 8px 0 24px color-mix(in srgb, #000000 18%, transparent);
+          transform: translateX(-100%);
+          transition: transform 160ms ease, visibility 0s linear 160ms;
+        }
+
+        body.local-mr-files-open #diff > .d2h-file-list-wrapper {
+          visibility: visible;
+          transform: translateX(0);
+          transition: transform 160ms ease;
+        }
+
+        .local-mr-mobile-sidebar-backdrop {
+          position: fixed;
+          inset: var(--lm-content-top) 0 0;
+          z-index: 30;
+          display: block;
+          padding: 0;
+          pointer-events: none;
+          opacity: 0;
+          border: 0;
+          background: color-mix(in srgb, #000000 28%, transparent);
+          cursor: default;
+          transition: opacity 160ms ease;
+        }
+
+        body.local-mr-files-open .local-mr-mobile-sidebar-backdrop {
+          pointer-events: auto;
+          opacity: 1;
+        }
+
+        #diff > .d2h-wrapper {
+          padding: 12px 10px 48px;
         }
       }
     </style>
@@ -1353,6 +2027,8 @@
             throw new Error("The version response is missing complete review data");
           }
           body.querySelector(":scope > .local-mr-version-bar")?.remove();
+          body.querySelector(":scope > .local-mr-review-source-warning")?.remove();
+          body.querySelector(":scope > [data-local-mr-commit-message]")?.remove();
           currentDiff.replaceWith(nextDiff);
           heading.textContent = payload.heading;
           heading.title = payload.heading;
@@ -1384,6 +2060,13 @@
           return;
         }
 
+        document.documentElement.dataset.localMrDiffWorkspace = "review-ui-v1";
+        diff.dataset.localMrDiffWorkspace = "";
+        diff.dataset.localMrDiffReview = "";
+        sidebar.dataset.localMrFileTree = "";
+        details.dataset.localMrFileDetail = "";
+        details.dataset.localMrDiffViewport = "";
+
         const colorRoot = diff.querySelector(".d2h-wrapper");
         if (colorRoot?.classList.contains("d2h-dark-color-scheme")) {
           body.classList.add("local-mr-dark");
@@ -1399,6 +2082,125 @@
         };
 
         const { element: versionDataElement, value: versionData } = readVersionData();
+        const reviewNavigation = versionData?.reviewNavigation;
+        const declaredVirtualSourceState = ["missing", "current", "stale"].includes(
+          reviewNavigation?.virtualState,
+        )
+          ? reviewNavigation.virtualState
+          : null;
+        const virtualSourceState = declaredVirtualSourceState
+          || (versionData?.virtualSession?.sourceStale === true
+            ? "stale"
+            : reviewNavigation?.virtualUrl ? "current" : "missing");
+        const buildCommitMessage = () => {
+          const commit = versionData?.focusedCommit;
+          if (!commit || !["real", "virtual"].includes(commit.kind) || !commit.title) return null;
+
+          const panel = document.createElement("section");
+          panel.className = "local-mr-commit-message";
+          panel.dataset.localMrCommitMessage = "";
+          panel.dataset.localMrReviewContext = "";
+          panel.dataset.kind = commit.kind;
+          panel.dataset.reviewKind = commit.kind;
+          if (commit.commitId) panel.dataset.commitId = commit.commitId;
+          panel.setAttribute("aria-labelledby", "local-mr-commit-message-title");
+
+          const header = document.createElement("header");
+          header.className = "local-mr-commit-message-header";
+          const label = makeSpan(
+            "local-mr-commit-message-label",
+            commit.label || (commit.kind === "virtual" ? "AI review index" : "Git commit message"),
+          );
+          const meta = makeSpan(
+            "local-mr-commit-message-meta",
+            [commit.orderLabel, commit.meta].filter(Boolean).join(" / "),
+          );
+          if (commit.orderLabel) meta.dataset.reviewOrder = commit.orderLabel;
+          header.append(label, meta);
+
+          const title = document.createElement("h2");
+          title.id = "local-mr-commit-message-title";
+          title.className = "local-mr-commit-message-title";
+          title.dataset.reviewTitle = "";
+          title.textContent = commit.title;
+
+          const description = document.createElement("p");
+          description.className = "local-mr-commit-message-body";
+          description.dataset.reviewDescription = "";
+          description.textContent = commit.description || "";
+          panel.append(header, title, description);
+
+          const reviewFocus = (Array.isArray(commit.reviewFocus) ? commit.reviewFocus : [])
+            .map((item) => typeof item === "string" ? item : item?.text)
+            .filter((item) => typeof item === "string" && item.trim());
+          if (reviewFocus.length > 0) {
+            const index = document.createElement("ol");
+            index.className = "local-mr-commit-review-index";
+            index.dataset.reviewFocusList = "";
+            reviewFocus.forEach((item) => {
+              const entry = document.createElement("li");
+              entry.textContent = item;
+              index.append(entry);
+            });
+            panel.append(index);
+          }
+
+          if (commit.risk?.reason) {
+            const risk = document.createElement("p");
+            risk.className = "local-mr-commit-message-risk";
+            risk.dataset.reviewRisk = commit.risk.level || "unrated";
+            const riskLabel = document.createElement("strong");
+            riskLabel.textContent = "Risk: ";
+            risk.append(riskLabel, document.createTextNode(commit.risk.reason));
+            panel.append(risk);
+          }
+
+          diff.insertAdjacentElement("beforebegin", panel);
+          return panel;
+        };
+
+        const buildVirtualSourceWarning = () => {
+          if (reviewNavigation?.active !== "virtual" || virtualSourceState !== "stale") return null;
+          const review = reviewNavigation?.virtualReview || {};
+          const sourceCommit = review.sourceCommit || {};
+          const currentCommit = review.currentCommit || {};
+          const commitLabel = (commit, fallback) => (
+            commit.shortSha
+            || (typeof commit.sha === "string" ? commit.sha.slice(0, 8) : "")
+            || fallback
+          );
+          const sourceLabel = commitLabel(sourceCommit, "an earlier commit");
+          const currentLabel = commitLabel(currentCommit, "the current branch");
+          const warning = document.createElement("aside");
+          warning.className = "local-mr-review-source-warning";
+          warning.dataset.reviewSourceWarning = "";
+          warning.dataset.reviewSourceState = "stale";
+          if (sourceCommit.sha) warning.dataset.sourceCommit = sourceCommit.sha;
+          if (currentCommit.sha) warning.dataset.currentCommit = currentCommit.sha;
+          warning.setAttribute("role", "status");
+          warning.setAttribute("aria-live", "polite");
+
+          const heading = document.createElement("strong");
+          heading.textContent = review.revision
+            ? `Virtual Review R${review.revision} is out of date.`
+            : "Virtual Review is out of date.";
+          const frozen = document.createElement("code");
+          frozen.textContent = sourceLabel;
+          frozen.title = sourceCommit.sha || sourceLabel;
+          const current = document.createElement("code");
+          current.textContent = currentLabel;
+          current.title = currentCommit.sha || currentLabel;
+          warning.append(
+            heading,
+            document.createTextNode(" It was frozen at "),
+            frozen,
+            document.createTextNode("; the current branch is "),
+            current,
+            document.createTextNode(". Later commits are not included in this Virtual Review."),
+          );
+          diff.insertAdjacentElement("beforebegin", warning);
+          return warning;
+        };
         const readTokensPromise = versionData?.readStateUrl
           ? fetch(versionData.readStateUrl, { headers: { Accept: "application/json" } })
             .then((response) => {
@@ -1420,7 +2222,7 @@
               else reject(new Error(`${globalName} did not load`));
             }, { once: true });
             script.addEventListener("error", () => {
-              reject(new Error(`Could not load Markdown preview dependency: ${globalName}`));
+              reject(new Error(`Could not load browser dependency: ${globalName}`));
             }, { once: true });
             document.head.append(script);
           }).catch((error) => {
@@ -1431,6 +2233,54 @@
           return loading;
         };
 
+        const languageForPath = (filePath) => {
+          const basename = String(filePath || "").split("/").at(-1) || "";
+          if (/^(?:dockerfile|containerfile)(?:\..+)?$/i.test(basename)) return "dockerfile";
+          if (/^(?:gnu)?makefile(?:\..+)?$/i.test(basename)) return "makefile";
+          return basename.match(/\.([^.]+)$/)?.[1]?.toLocaleLowerCase() || "";
+        };
+        const syntaxHighlightLoad = versionData?.assets?.syntaxHighlight
+          ? loadLibrary(versionData.assets.syntaxHighlight, "Diff2HtmlUI").catch((error) => {
+            console.error("Local MR could not load syntax highlighting", error);
+            return null;
+          })
+          : Promise.resolve(null);
+        const highlightSyntax = async (wrapper, roots = [wrapper]) => {
+          if (!wrapper) return false;
+          const Diff2HtmlUI = await syntaxHighlightLoad;
+          if (!Diff2HtmlUI) return false;
+          const lines = [...new Set(roots.flatMap((root) => {
+            if (!root) return [];
+            const nested = [...root.querySelectorAll?.(".d2h-code-line-ctn:not(.hljs)") || []];
+            return root.matches?.(".d2h-code-line-ctn:not(.hljs)")
+              ? [root, ...nested]
+              : nested;
+          }))];
+          if (lines.length === 0) return true;
+
+          const staging = document.createElement("div");
+          const stagingFile = document.createElement("div");
+          stagingFile.className = "d2h-file-wrapper";
+          stagingFile.dataset.lang = wrapper.dataset.lang || languageForPath(wrapper.dataset.filePath);
+          staging.append(stagingFile);
+          const placeholders = lines.map((line) => {
+            const placeholder = document.createComment("local-mr-syntax-line");
+            line.replaceWith(placeholder);
+            stagingFile.append(line);
+            return { line, placeholder };
+          });
+          try {
+            const highlighter = new Diff2HtmlUI(staging, undefined, { highlight: false });
+            highlighter.highlightCode();
+            return true;
+          } catch (error) {
+            console.error("Local MR could not highlight this file", error);
+            return false;
+          } finally {
+            placeholders.forEach(({ line, placeholder }) => placeholder.replaceWith(line));
+          }
+        };
+
         const renderMarkdown = async (filePath, container) => {
           container.textContent = "";
           container.append(makeSpan("local-mr-preview-loading", "Generating Markdown preview…"));
@@ -1439,6 +2289,7 @@
             previewUrl.searchParams.set("mode", versionData.selection.mode);
             previewUrl.searchParams.set("from", versionData.selection.from);
             previewUrl.searchParams.set("to", versionData.selection.to);
+            previewUrl.searchParams.set("patch", versionData.patchId);
             previewUrl.searchParams.set("path", filePath);
             const previewPayload = fetch(previewUrl, { headers: { Accept: "application/json" } })
               .then(async (response) => {
@@ -1537,7 +2388,7 @@
         };
 
         const buildVersionBar = () => {
-          if (!versionData?.pushVersions?.length) {
+          if (!versionData?.commits?.length) {
             return;
           }
 
@@ -1608,14 +2459,149 @@
             return { option, titleRow };
           };
 
+          if (
+            ["real", "virtual"].includes(reviewNavigation?.active)
+            && reviewNavigation.realUrl
+          ) {
+            const sourceSwitch = document.createElement("nav");
+            sourceSwitch.className = "local-mr-review-source";
+            sourceSwitch.dataset.reviewSourceSwitch = "";
+            sourceSwitch.setAttribute("aria-label", "Review source");
+            [
+              {
+                id: "lm-real-commits-link",
+                source: "real",
+                wide: "Real commits",
+                short: "Real",
+                href: reviewNavigation.realUrl,
+                title: "Review the repository's Git commits",
+              },
+              {
+                id: "lm-virtual-commits-link",
+                source: "virtual",
+                wide: "Virtual commits",
+                short: "Virtual",
+                unavailableWide: "Virtual · none",
+                unavailableShort: "V · none",
+                staleWide: "Virtual · stale",
+                staleShort: "V · stale",
+                href: reviewNavigation.virtualUrl,
+                title: "Follow the agent-recommended reading order",
+              },
+            ].forEach((item) => {
+              const requestedState = item.source === "virtual" ? virtualSourceState : "current";
+              const available = Boolean(item.href) && requestedState !== "missing";
+              const sourceState = available ? requestedState : "missing";
+              const wideLabel = sourceState === "stale"
+                ? item.staleWide || item.wide
+                : available ? item.wide : item.unavailableWide || item.wide;
+              const shortLabel = sourceState === "stale"
+                ? item.staleShort || item.short
+                : available ? item.short : item.unavailableShort || item.short;
+              const option = document.createElement(available ? "a" : "button");
+              option.id = item.id;
+              option.className = "local-mr-review-source-option";
+              option.dataset.reviewSource = item.source;
+              option.dataset.reviewSourceAvailable = String(available);
+              option.dataset.reviewSourceState = sourceState;
+              if (available) {
+                option.href = item.href;
+                option.title = sourceState === "stale"
+                  ? "Open the frozen Virtual Review; later branch commits are not included"
+                  : item.title;
+                option.rel = "noreferrer";
+              } else {
+                const reason = reviewNavigation.virtualUnavailableReason
+                  || "No matching Virtual Review is attached to this comparison";
+                option.type = "button";
+                option.disabled = true;
+                option.setAttribute("aria-disabled", "true");
+                option.setAttribute("aria-label", `${item.wide} unavailable: ${reason}`);
+                option.title = reason;
+              }
+              if (item.source === reviewNavigation.active) option.setAttribute("aria-current", "page");
+              if (reviewNavigation.active === "virtual" && item.source === "real") {
+                const syncVirtualReturn = () => {
+                  const destination = new URL(reviewNavigation.realUrl, document.baseURI);
+                  destination.searchParams.set("return", location.href);
+                  option.href = destination.href;
+                };
+                option.addEventListener("pointerdown", syncVirtualReturn);
+                option.addEventListener("click", syncVirtualReturn);
+              }
+              if (
+                reviewNavigation.active === "real"
+                && item.source === "virtual"
+                && available
+              ) {
+                const syncRealReturn = () => {
+                  try {
+                    const destination = new URL(item.href, document.baseURI);
+                    if (destination.origin !== location.origin) return;
+                    destination.searchParams.set("return", location.href);
+                    option.href = destination.href;
+                  } catch {
+                    // Leave malformed or non-navigable legacy destinations untouched.
+                  }
+                };
+                option.addEventListener("pointerdown", syncRealReturn);
+                option.addEventListener("click", syncRealReturn);
+              }
+              option.append(
+                makeSpan("local-mr-source-label-wide", wideLabel),
+                makeSpan("local-mr-source-label-short", shortLabel),
+              );
+              sourceSwitch.append(option);
+            });
+            const divider = makeSpan("local-mr-review-source-divider", "");
+            divider.setAttribute("aria-hidden", "true");
+            versionBar.append(sourceSwitch, divider);
+          }
+
+          const sourceControls = document.createElement("div");
+          sourceControls.className = "local-mr-source-controls";
+          sourceControls.setAttribute(
+            "aria-label",
+            versionData.virtualSession ? "Virtual comparison controls" : "Real comparison controls",
+          );
+          versionBar.append(sourceControls);
+
+          const selectionForMode = (mode) => {
+            const configured = versionData.modeDefaults?.[mode];
+            if (configured?.from && configured?.to) {
+              return { mode, from: configured.from, to: configured.to };
+            }
+            if (versionData.modeDefaults && Object.hasOwn(versionData.modeDefaults, mode)) {
+              return null;
+            }
+            if (mode === "single" && versionData.commits.length > 0) {
+              const first = versionData.commits[0].sha;
+              return {
+                mode,
+                from: first,
+                to: first,
+              };
+            }
+            if (mode === "range" && versionData.commits.length > 0) {
+              return {
+                mode,
+                from: versionData.commits[0].sha,
+                to: versionData.commits.at(-1).sha,
+              };
+            }
+            return null;
+          };
+
           const modeControl = makeControl(
             "local-mr-version-mode",
-            versionData.mode === "commits" ? "Commits" : "Pushes",
+            versionData.mode === "single" ? "Single commit" : "Commit range",
           );
           [
-            { value: "push", label: "Pushes" },
-            { value: "commits", label: "Commits" },
-          ].forEach((mode) => {
+            { value: "single", label: "Single commit" },
+            { value: "range", label: "Commit range" },
+          ].filter((mode) => (
+            mode.value === versionData.mode || selectionForMode(mode.value)
+          )).forEach((mode) => {
             appendOption({
               menu: modeControl.menu,
               title: mode.label,
@@ -1625,159 +2611,329 @@
                   closeMenus();
                   return;
                 }
-                if (mode.value === "commits" && versionData.commits.length > 0) {
-                  navigateToVersion({
-                    mode: "commits",
-                    from: versionData.commits[0].sha,
-                    to: versionData.commits.at(-1).sha,
-                  });
-                } else {
-                  navigateToVersion({
-                    mode: "push",
-                    from: "base",
-                    to: versionData.pushVersions.at(-1).value,
-                  });
-                }
+                const selection = selectionForMode(mode.value);
+                if (selection) void navigateToVersion(selection);
               },
             });
           });
-          versionBar.append(modeControl.control);
+          sourceControls.append(modeControl.control);
 
-          if (versionData.mode === "push") {
-            const selectedFrom = versionData.pushVersions.find((version) => {
-              return version.value === versionData.selection.from;
+          const commitLabel = (commit) => [commit.shortSha, commit.subject]
+            .filter(Boolean)
+            .join(" · ");
+          const commitDescription = (commit) => commit.description
+            || commit.intent
+            || (commit.virtual
+              ? "Staged, unstaged, and untracked files"
+              : [commit.author, commit.dateLabel].filter(Boolean).join(" · "));
+          const appendCommitOption = ({ control, commit, selected, selection }) => {
+            const { titleRow } = appendOption({
+              menu: control.menu,
+              title: commitLabel(commit),
+              description: commitDescription(commit),
+              selected,
+              className: `local-mr-commit-option${commit.virtual ? " local-mr-virtual-version" : ""}`,
+              onClick: () => navigateToVersion(selection),
             });
-            const selectedTo = versionData.pushVersions.find((version) => {
-              return version.value === versionData.selection.to;
-            });
-            const fromIndex = versionData.pushVersions.indexOf(selectedFrom);
-            const toIndex = versionData.pushVersions.indexOf(selectedTo);
-            const fromControl = makeControl("local-mr-push-version", selectedFrom.label);
-            versionData.pushVersions.slice(0, toIndex).forEach((version) => {
-              appendOption({
-                menu: fromControl.menu,
-                title: version.label,
-                description: version.description,
-                selected: version.value === selectedFrom.value,
-                onClick: () => navigateToVersion({
-                  mode: "push",
-                  from: version.value,
-                  to: selectedTo.value,
-                }),
-              });
-            });
-            versionBar.append(fromControl.control, makeSpan("local-mr-version-arrow", "→"));
+            titleRow.append(makeSpan("local-mr-commit-check", ""));
+          };
 
-            const toLabel = selectedTo.latest ? "Latest version" : selectedTo.label;
-            const toControl = makeControl("local-mr-push-version", toLabel);
-            versionData.pushVersions.slice(fromIndex + 1).forEach((version) => {
-              appendOption({
-                menu: toControl.menu,
-                title: version.label,
-                description: version.description,
-                selected: version.value === selectedTo.value,
-                onClick: () => navigateToVersion({
-                  mode: "push",
-                  from: selectedFrom.value,
-                  to: version.value,
-                }),
-              });
-            });
-            versionBar.append(toControl.control);
-          } else if (versionData.commits.length > 0) {
-            const firstSelected = versionData.commits.findIndex((commit) => {
-              return commit.sha === versionData.selection.from;
-            });
-            const lastSelected = versionData.commits.findIndex((commit) => {
-              return commit.sha === versionData.selection.to;
-            });
-            const actualCommits = versionData.commits.filter((commit) => !commit.virtual);
-            const hasVirtualCommit = versionData.commits.some((commit) => commit.virtual);
-            const selectedCommits = versionData.commits.slice(firstSelected, lastSelected + 1);
-            const selectedActualCount = selectedCommits.filter((commit) => !commit.virtual).length;
-            const selectedVirtual = selectedCommits.some((commit) => commit.virtual);
-            const allSelected = firstSelected === 0 && lastSelected === versionData.commits.length - 1;
-            const allActualSelected = actualCommits.length > 0
-              && firstSelected === 0
-              && lastSelected === actualCommits.length - 1;
-            let rangeLabel;
-            if (selectedVirtual && actualCommits.length === 0) {
-              rangeLabel = "Uncommitted changes";
-            } else if (allSelected && selectedVirtual) {
-              rangeLabel = "All commits + uncommitted changes";
-            } else if (allActualSelected) {
-              rangeLabel = `All commits (${actualCommits.length})`;
-            } else if (selectedVirtual && selectedActualCount === 0) {
-              rangeLabel = "Uncommitted changes";
-            } else {
-              rangeLabel = `Selected ${selectedActualCount} commit${selectedActualCount === 1 ? "" : "s"}${selectedVirtual ? " + uncommitted changes" : ""}`;
-            }
-            const rangeControl = makeControl("local-mr-commit-range", rangeLabel);
-            appendOption({
-              menu: rangeControl.menu,
-              title: hasVirtualCommit && actualCommits.length === 0
-                ? "Uncommitted changes"
-                : hasVirtualCommit ? "All commits + uncommitted changes" : "All commits",
-              description: hasVirtualCommit && actualCommits.length === 0
-                ? "Staged, unstaged, and untracked files"
-                : hasVirtualCommit
-                ? `${actualCommits.length} commits + 1 uncommitted version`
-                : `${actualCommits.length} commits`,
-              selected: allSelected,
-              onClick: () => navigateToVersion({
-                mode: "commits",
-                from: versionData.commits[0].sha,
-                to: versionData.commits.at(-1).sha,
-              }),
-            });
-            if (hasVirtualCommit && actualCommits.length > 0) {
-              appendOption({
-                menu: rangeControl.menu,
-                title: "All commits",
-                description: `${actualCommits.length} commits, excluding uncommitted changes`,
-                selected: allActualSelected,
-                onClick: () => navigateToVersion({
-                  mode: "commits",
-                  from: actualCommits[0].sha,
-                  to: actualCommits.at(-1).sha,
-                }),
-              });
-            }
-            const sectionLabel = document.createElement("div");
-            sectionLabel.className = "local-mr-commit-section-label";
-            const sectionHint = document.createElement("small");
-            sectionHint.textContent = "Tip: Shift-click to select a range";
-            sectionLabel.append(
-              makeSpan("", "Select commits"),
-              sectionHint,
+          if (versionData.mode === "single" && versionData.commits.length > 0) {
+            const selectedIndex = Math.max(0, versionData.commits.findIndex((commit) => (
+              commit.sha === versionData.selection.from
+            )));
+            const selectedCommit = versionData.commits[selectedIndex];
+            const commitControl = makeControl(
+              "local-mr-commit-range local-mr-single-commit",
+              commitLabel(selectedCommit) || "Choose commit",
             );
-            rangeControl.menu.append(sectionLabel);
-            versionData.commits.forEach((commit, index) => {
-              const selected = !allSelected && index >= firstSelected && index <= lastSelected;
-              const { titleRow } = appendOption({
-                menu: rangeControl.menu,
-                title: commit.subject,
-                description: commit.virtual
-                  ? "Staged, unstaged, and untracked files"
-                  : `${commit.author} committed on ${commit.dateLabel} · ${commit.shortSha}`,
-                selected,
-                className: `local-mr-commit-option${commit.virtual ? " local-mr-virtual-version" : ""}`,
-                onClick: (event) => {
-                  if (event.shiftKey && firstSelected >= 0) {
-                    const rangeStart = Math.min(firstSelected, index);
-                    const rangeEnd = Math.max(firstSelected, index);
-                    return navigateToVersion({
-                      mode: "commits",
-                      from: versionData.commits[rangeStart].sha,
-                      to: versionData.commits[rangeEnd].sha,
-                    });
-                  }
-                  return navigateToVersion({ mode: "commits", from: commit.sha, to: commit.sha });
-                },
+            versionData.commits.forEach((commit, index) => appendCommitOption({
+              control: commitControl,
+              commit,
+              selected: index === selectedIndex,
+              selection: { mode: "single", from: commit.sha, to: commit.sha },
+            }));
+            sourceControls.append(commitControl.control);
+          } else if (versionData.mode === "range" && versionData.commits.length > 0) {
+            const fromIndex = versionData.commits.findIndex((commit) => (
+              commit.sha === versionData.selection.from
+            ));
+            const toIndex = versionData.commits.findIndex((commit) => (
+              commit.sha === versionData.selection.to
+            ));
+            if (fromIndex >= 0 && toIndex >= fromIndex) {
+              const fromCommit = versionData.commits[fromIndex];
+              const toCommit = versionData.commits[toIndex];
+              const fromControl = makeControl(
+                "local-mr-commit-range local-mr-range-start",
+                commitLabel(fromCommit),
+              );
+              versionData.commits.slice(0, toIndex + 1).forEach((commit, index) => {
+                appendCommitOption({
+                  control: fromControl,
+                  commit,
+                  selected: index === fromIndex,
+                  selection: { mode: "range", from: commit.sha, to: toCommit.sha },
+                });
               });
-              titleRow.append(makeSpan("local-mr-commit-check", ""));
-            });
-            versionBar.append(rangeControl.control);
+              sourceControls.append(
+                fromControl.control,
+                makeSpan("local-mr-version-arrow", "→"),
+              );
+
+              const toControl = makeControl(
+                "local-mr-commit-range local-mr-range-end",
+                commitLabel(toCommit),
+              );
+              versionData.commits.slice(fromIndex).forEach((commit, offset) => {
+                const index = fromIndex + offset;
+                appendCommitOption({
+                  control: toControl,
+                  commit,
+                  selected: index === toIndex,
+                  selection: { mode: "range", from: fromCommit.sha, to: commit.sha },
+                });
+              });
+              sourceControls.append(toControl.control);
+            }
+          }
+
+          const virtualSession = versionData.virtualSession;
+          if (virtualSession) {
+            const revisions = Array.isArray(virtualSession.revisions)
+              ? virtualSession.revisions
+              : [];
+            const currentRevision = revisions.find((item) => (
+              item.current || String(item.revision) === String(virtualSession.revision)
+            ));
+            if (revisions.length > 0) {
+              const revisionCommitLabel = (item, fullSha = false) => {
+                const commit = item?.branchCommit;
+                if (!commit?.sha) return "";
+                const displayedSha = fullSha
+                  ? commit.sha
+                  : commit.shortSha || commit.sha.slice(0, 8);
+                return [
+                  `Commit ${displayedSha}`,
+                  commit.subject,
+                  commit.branchName,
+                ].filter(Boolean).join(" · ");
+              };
+              const revisionLabel = currentRevision ? [
+                `R${currentRevision.revision}`,
+                currentRevision.branchCommit?.shortSha
+                  || currentRevision.branchCommit?.sha?.slice(0, 8),
+                currentRevision.title,
+              ].filter(Boolean).join(" · ") : `Revision ${virtualSession.revision}`;
+              const revisionControl = makeControl(
+                "local-mr-virtual-revision",
+                revisionLabel,
+              );
+              revisionControl.trigger.title = [
+                currentRevision?.label || revisionLabel,
+                revisionCommitLabel(currentRevision, true),
+              ].filter(Boolean).join(" — ");
+              revisions.forEach((item) => {
+                const selected = Boolean(item.current)
+                  || String(item.revision) === String(virtualSession.revision);
+                const commitLabel = revisionCommitLabel(item);
+                const appended = appendOption({
+                  menu: revisionControl.menu,
+                  title: item.label || `Revision ${item.revision}`,
+                  description: [
+                    commitLabel,
+                    item.createdAt ? `Plan ${item.createdAt}` : "",
+                  ].filter(Boolean).join(" · "),
+                  selected,
+                  onClick: () => {
+                    if (selected) {
+                      closeMenus();
+                      return false;
+                    }
+                    const destination = item.url
+                      ? new URL(item.url, document.baseURI)
+                      : new URL(versionData.reviewUrl || location.href, document.baseURI);
+                    if (!item.url) {
+                      destination.searchParams.set("revision", item.revision);
+                      destination.searchParams.delete("mode");
+                      destination.searchParams.delete("from");
+                      destination.searchParams.delete("to");
+                      destination.hash = "";
+                    }
+                    location.assign(destination.href);
+                  },
+                });
+                appended.option.dataset.revision = String(item.revision);
+                if (item.branchCommit?.sha) {
+                  appended.option.dataset.branchCommit = item.branchCommit.sha;
+                  appended.option.title = [
+                    item.label || `Revision ${item.revision}`,
+                    revisionCommitLabel(item, true),
+                  ].filter(Boolean).join(" — ");
+                }
+              });
+              sourceControls.append(revisionControl.control);
+            }
+
+            const reviewedCommitIds = Array.isArray(virtualSession.reviewedCommitIds)
+              ? virtualSession.reviewedCommitIds
+              : null;
+            const reviewedIds = new Set(reviewedCommitIds || []);
+            let reviewedCount = reviewedCommitIds
+              ? reviewedIds.size
+              : Math.max(0, Number(virtualSession.reviewedCount) || 0);
+            const total = Math.max(0, Number(virtualSession.total) || versionData.commits.length);
+            const sourceStatus = virtualSession.sourceStale === true
+              ? "Source changed"
+              : virtualSession.repositoryAvailable === false ? "Frozen source" : "";
+            const progressText = () => [
+              sourceStatus,
+              `${reviewedCount}/${total} virtual commits reviewed`,
+            ].filter(Boolean).join(" · ");
+            const progress = makeSpan(
+              "local-mr-virtual-progress",
+              progressText(),
+            );
+
+            const currentCommitId = virtualSession.currentCommitId || "";
+            let currentCommitIndex = versionData.commits.findIndex((commit) => (
+              commit.id === currentCommitId
+              || commit.sha === currentCommitId
+              || commit.sha === versionData.selection.from
+            ));
+            if (currentCommitIndex < 0 && Number(virtualSession.currentIndex) > 0) {
+              currentCommitIndex = Number(virtualSession.currentIndex) - 1;
+            }
+            const currentCommit = currentCommitIndex >= 0
+              ? versionData.commits[currentCommitIndex]
+              : null;
+            const progressCommitId = currentCommitId || currentCommit?.id || currentCommit?.sha || "";
+            const saveProgress = (kind, value) => {
+              if (!virtualSession.progressUrl || !progressCommitId) return Promise.resolve();
+              return fetch(virtualSession.progressUrl, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ commitId: progressCommitId, kind, value }),
+                keepalive: true,
+              }).then((response) => {
+                if (!response.ok) {
+                  throw new Error(`Could not save virtual review progress: ${response.status}`);
+                }
+              });
+            };
+            const makeVirtualAction = ({ label, shortLabel = label, action, pressed }) => {
+              const button = document.createElement("button");
+              button.type = "button";
+              button.className = "local-mr-virtual-action";
+              button.dataset.virtualAction = action;
+              if (pressed !== undefined) button.setAttribute("aria-pressed", String(pressed));
+              button.append(
+                makeSpan("local-mr-source-label-wide", label),
+                makeSpan("local-mr-source-label-short", shortLabel),
+              );
+              return button;
+            };
+
+            if (
+              versionData.mode === "single"
+              && currentCommit
+            ) {
+              const selectionForAdjacentCommit = (offset, fallback) => {
+                const commit = versionData.commits[currentCommitIndex + offset];
+                if (commit?.sha) {
+                  return { mode: "single", from: commit.sha, to: commit.sha };
+                }
+                if (typeof fallback === "string" && fallback) {
+                  return { mode: "single", from: fallback, to: fallback };
+                }
+                if (fallback?.from && fallback?.to) {
+                  return { mode: "single", from: fallback.from, to: fallback.to };
+                }
+                return null;
+              };
+              const previousSelection = selectionForAdjacentCommit(
+                -1,
+                virtualSession.previousSelection,
+              );
+              const nextSelection = selectionForAdjacentCommit(
+                1,
+                virtualSession.nextSelection,
+              );
+
+              const previous = makeVirtualAction({
+                label: "Previous",
+                shortLabel: "‹",
+                action: "previous",
+              });
+              previous.disabled = !previousSelection;
+              previous.title = previousSelection
+                ? "Previous virtual commit"
+                : "This is the first virtual commit";
+              previous.addEventListener("click", () => {
+                if (previousSelection) void navigateToVersion(previousSelection);
+              });
+              sourceControls.append(previous);
+
+              const next = makeVirtualAction({
+                label: "Next",
+                shortLabel: "›",
+                action: "next",
+              });
+              next.disabled = !nextSelection;
+              next.title = nextSelection
+                ? "Next virtual commit"
+                : "This is the final virtual commit";
+              next.addEventListener("click", () => {
+                if (nextSelection) void navigateToVersion(nextSelection);
+              });
+              sourceControls.append(next);
+
+              let isReviewed = reviewedIds.has(progressCommitId);
+              const reviewedButton = makeVirtualAction({
+                label: isReviewed ? "Reviewed" : "Mark reviewed",
+                shortLabel: isReviewed ? "✓" : "○",
+                action: "reviewed",
+                pressed: isReviewed,
+              });
+              const renderReviewedButton = () => {
+                reviewedButton.replaceChildren(
+                  makeSpan("local-mr-source-label-wide", isReviewed ? "Reviewed" : "Mark reviewed"),
+                  makeSpan("local-mr-source-label-short", isReviewed ? "✓" : "○"),
+                );
+                reviewedButton.setAttribute("aria-pressed", String(isReviewed));
+                reviewedButton.setAttribute(
+                  "aria-label",
+                  isReviewed ? "Mark virtual commit unreviewed" : "Mark virtual commit reviewed",
+                );
+                reviewedButton.title = isReviewed
+                  ? "Mark this virtual commit unreviewed"
+                  : "Mark this virtual commit reviewed";
+              };
+              renderReviewedButton();
+              reviewedButton.addEventListener("click", async () => {
+                const previousValue = isReviewed;
+                isReviewed = !isReviewed;
+                if (isReviewed) reviewedIds.add(progressCommitId);
+                else reviewedIds.delete(progressCommitId);
+                reviewedCount = reviewedIds.size;
+                renderReviewedButton();
+                progress.textContent = progressText();
+                try {
+                  await saveProgress("reviewed", isReviewed);
+                } catch (error) {
+                  isReviewed = previousValue;
+                  if (isReviewed) reviewedIds.add(progressCommitId);
+                  else reviewedIds.delete(progressCommitId);
+                  reviewedCount = reviewedIds.size;
+                  renderReviewedButton();
+                  progress.textContent = progressText();
+                  console.error(error);
+                }
+              });
+              sourceControls.append(reviewedButton);
+              void saveProgress("viewed", true).catch((error) => console.error(error));
+            }
+            versionBar.append(progress);
           }
 
           heading.insertAdjacentElement("afterend", versionBar);
@@ -1786,9 +2942,24 @@
           document.addEventListener("keydown", (event) => {
             if (event.key === "Escape") closeMenus();
           }, { signal });
+          return versionBar;
         };
 
-        buildVersionBar();
+        const versionBar = buildVersionBar();
+        const sourceWarning = buildVirtualSourceWarning();
+        const commitMessage = buildCommitMessage();
+        const syncContentTop = () => {
+          body.style.setProperty("--lm-content-top", `${Math.max(0, Math.round(diff.getBoundingClientRect().top))}px`);
+        };
+        syncContentTop();
+        window.addEventListener("resize", syncContentTop, { signal });
+        if (window.ResizeObserver) {
+          const contentTopObserver = new ResizeObserver(syncContentTop);
+          [heading, versionBar, sourceWarning, commitMessage].filter(Boolean).forEach((element) => {
+            contentTopObserver.observe(element);
+          });
+          signal.addEventListener("abort", () => contentTopObserver.disconnect(), { once: true });
+        }
 
         const rawHeading = heading.textContent.trim().replace(/^Local MR:\s*/, "");
         const arrowAt = rawHeading.indexOf("→");
@@ -1797,7 +2968,40 @@
 
         heading.textContent = "";
         heading.title = rawHeading;
+        const mobileFilesToggle = document.createElement("button");
+        mobileFilesToggle.type = "button";
+        mobileFilesToggle.className = "local-mr-mobile-files-toggle";
+        mobileFilesToggle.setAttribute("aria-label", "Show changed files");
+        mobileFilesToggle.setAttribute("aria-expanded", "false");
+        mobileFilesToggle.setAttribute("aria-controls", "local-mr-file-sidebar");
+        mobileFilesToggle.append(makeSpan("local-mr-mobile-files-icon", ""));
+        sidebar.id = "local-mr-file-sidebar";
+
+        body.classList.remove("local-mr-files-open");
+        body.querySelector(":scope > .local-mr-mobile-sidebar-backdrop")?.remove();
+        const mobileSidebarBackdrop = document.createElement("button");
+        mobileSidebarBackdrop.type = "button";
+        mobileSidebarBackdrop.className = "local-mr-mobile-sidebar-backdrop";
+        mobileSidebarBackdrop.setAttribute("aria-label", "Close changed files");
+        body.append(mobileSidebarBackdrop);
+        const setMobileFilesOpen = (open, { restoreFocus = false } = {}) => {
+          body.classList.toggle("local-mr-files-open", open);
+          mobileFilesToggle.setAttribute("aria-expanded", String(open));
+          mobileFilesToggle.setAttribute("aria-label", open ? "Hide changed files" : "Show changed files");
+          if (!open && restoreFocus) mobileFilesToggle.focus();
+        };
+        mobileFilesToggle.addEventListener("click", () => {
+          setMobileFilesOpen(!body.classList.contains("local-mr-files-open"));
+        });
+        mobileSidebarBackdrop.addEventListener("click", () => {
+          setMobileFilesOpen(false, { restoreFocus: true });
+        });
+        window.addEventListener("resize", () => {
+          if (window.innerWidth > 600) setMobileFilesOpen(false);
+        }, { signal });
+
         heading.append(
+          mobileFilesToggle,
           makeSpan("local-mr-brand", "LOCAL MR"),
           makeSpan("local-mr-branch", sourceBranch),
           makeSpan("local-mr-arrow", "→"),
@@ -1822,13 +3026,6 @@
         const totalDeleted = fileItems.reduce((sum, item) => {
           return sum + Math.abs(Number.parseInt(item.querySelector(".d2h-lines-deleted")?.textContent, 10) || 0);
         }, 0);
-        const summary = document.createElement("span");
-        summary.className = "local-mr-summary";
-        summary.append(makeSpan("local-mr-summary-files", `${fileItems.length} files`));
-        if (totalAdded > 0) summary.append(makeSpan("local-mr-summary-added", `+${totalAdded}`));
-        if (totalDeleted > 0) summary.append(makeSpan("local-mr-summary-deleted", `−${totalDeleted}`));
-        heading.append(summary);
-
         const listHeader = sidebar.querySelector(".d2h-file-list-header");
         const listTitle = sidebar.querySelector(".d2h-file-list-title");
         const fileList = sidebar.querySelector(".d2h-file-list");
@@ -1837,6 +3034,16 @@
         }
 
         listTitle.textContent = `Changed files · ${fileItems.length}`;
+        const summary = document.createElement("span");
+        summary.className = "local-mr-summary";
+        summary.dataset.fileCount = String(fileItems.length);
+        summary.setAttribute(
+          "aria-label",
+          `${fileItems.length} changed files, ${totalAdded} additions, ${totalDeleted} deletions`,
+        );
+        if (totalAdded > 0) summary.append(makeSpan("local-mr-summary-added", `+${totalAdded}`));
+        if (totalDeleted > 0) summary.append(makeSpan("local-mr-summary-deleted", `−${totalDeleted}`));
+        if (summary.childElementCount > 0) listTitle.insertAdjacentElement("afterend", summary);
         const searchLabel = document.createElement("label");
         searchLabel.className = "local-mr-search-label";
         const search = document.createElement("input");
@@ -2124,6 +3331,7 @@
                   });
                 });
                 if (rows.length === 0) throw new Error("The selected section has no code to expand");
+                await highlightSyntax(wrapper, rows);
                 if (direction === "down") {
                   gap.row.before(...rows);
                   gap.start = payload.end + 1;
@@ -2249,6 +3457,7 @@
                   lineText,
                 });
               });
+              await highlightSyntax(wrapper, rows);
               footer.before(...rows);
               nextLine = payload.end + 1;
               lastHunk.oldLines += rows.length;
@@ -2292,6 +3501,10 @@
           link.append(makeSpan("local-mr-basename", basename));
 
           const targetId = link.hash.slice(1);
+          item.dataset.filePath = fullPath;
+          item.dataset.fileId = fileData?.id || targetId;
+          item.setAttribute("role", "treeitem");
+          item.setAttribute("aria-current", "false");
           const previewPath = fileData?.newPath
             || previewPathFor(fullPath, Boolean(item.querySelector(".d2h-moved")));
           const deleted = fileData?.status === "deleted" || Boolean(item.querySelector(".d2h-deleted"));
@@ -2369,6 +3582,8 @@
           if (!wrapper || wrapper.dataset.localMrPrepared === "true") return;
           wrapper.dataset.localMrPrepared = "true";
           const { fullPath, previewPath, deleted } = entry;
+          wrapper.dataset.filePath = fullPath;
+          wrapper.dataset.fileId = entry.item.dataset.fileId;
           const header = wrapper?.querySelector(".d2h-file-header");
           const headerName = header?.querySelector(".d2h-file-name");
           if (!headerName) {
@@ -2377,6 +3592,7 @@
           const slashAt = fullPath.lastIndexOf("/");
           const basename = slashAt >= 0 ? fullPath.slice(slashAt + 1) : fullPath;
           const directory = slashAt >= 0 ? fullPath.slice(0, slashAt + 1) : "";
+          if (!wrapper.dataset.lang) wrapper.dataset.lang = languageForPath(previewPath || fullPath);
           headerName.textContent = "";
           headerName.title = fullPath;
           headerName.append(makeSpan("local-mr-file-basename", basename));
@@ -2469,6 +3685,7 @@
             directoryButton.type = "button";
             directoryButton.className = "local-mr-tree-directory-row";
             directoryButton.setAttribute("aria-expanded", "true");
+            directoryButton.setAttribute("role", "treeitem");
             directoryButton.title = `${directoryName}/`;
             directoryButton.append(
               makeSpan("local-mr-tree-chevron", "›"),
@@ -2477,6 +3694,7 @@
             );
             const children = document.createElement("ul");
             children.className = "local-mr-tree-children";
+            children.setAttribute("role", "group");
             const directoryEntry = {
               item: directoryItem,
               button: directoryButton,
@@ -2504,6 +3722,10 @@
         fileList.classList.add("local-mr-tree");
         renderTreeNode(treeRoot, fileList);
         fileList.append(emptyItem);
+        if (fileItems.length === 0) {
+          emptyItem.textContent = "No committed file changes";
+          emptyItem.hidden = false;
+        }
 
         let activeId = "";
         let visibleWrapper = null;
@@ -2513,8 +3735,10 @@
             return;
           }
           linksById.get(activeId)?.item.classList.remove("local-mr-active");
+          linksById.get(activeId)?.item.setAttribute("aria-current", "false");
           const current = linksById.get(id);
           current?.item.classList.add("local-mr-active");
+          current?.item.setAttribute("aria-current", "true");
           if (current && !current.item.hidden) {
             let directory = current.item.parentElement?.closest(".local-mr-tree-directory");
             while (directory) {
@@ -2561,6 +3785,7 @@
 
         const goToFile = async (id) => {
           if (!linksById.has(id)) return;
+          setMobileFilesOpen(false);
           const navigationSequence = ++fileNavigationSequence;
           details.classList.add("local-mr-fragment-loading");
           let target;
@@ -2578,6 +3803,8 @@
           if (visibleWrapper && visibleWrapper !== target) visibleWrapper.hidden = true;
           mergeSplitDiff(target);
           prepareContextExpansion(linksById.get(id), target);
+          await highlightSyntax(target);
+          if (navigationSequence !== fileNavigationSequence) return;
           target.hidden = false;
           visibleWrapper = target;
           details.scrollTop = 0;
@@ -2631,7 +3858,10 @@
 
         document.addEventListener("keydown", (event) => {
           const typing = event.target.matches("input, textarea, select, [contenteditable='true']");
-          if (event.key === "/" && !typing) {
+          if (event.key === "Escape" && body.classList.contains("local-mr-files-open")) {
+            event.preventDefault();
+            setMobileFilesOpen(false, { restoreFocus: true });
+          } else if (event.key === "/" && !typing) {
             event.preventDefault();
             search.focus();
           } else if (event.key === "Escape" && document.activeElement === search) {
@@ -2641,9 +3871,23 @@
           }
         }, { signal });
 
-        const initialId = location.hash.slice(1);
+        let initialId = location.hash.slice(1);
+        if (
+          !linksById.has(initialId)
+          && (versionData?.virtualSession || versionData?.reviewKind === "virtual")
+        ) {
+          const rawTarget = new URL(location.href).searchParams.get("target") || "";
+          const target = rawTarget.replace(/^(?:block|file):/, "");
+          const targetIndex = versionData.files.findIndex((file) => (
+            file.id === target
+            || file.patchId === target
+            || file.blockIds?.includes(target)
+            || [file.path, file.displayPath, file.oldPath, file.newPath].includes(target)
+          ));
+          if (targetIndex >= 0) initialId = fileEntries[targetIndex]?.targetId || initialId;
+        }
         const firstId = fileWrappers[0]?.id;
-        void goToFile(linksById.has(initialId) ? initialId : firstId);
+        await goToFile(linksById.has(initialId) ? initialId : firstId);
         body.classList.remove("local-mr-version-loading");
         document.documentElement.classList.add("local-mr-ready");
         };

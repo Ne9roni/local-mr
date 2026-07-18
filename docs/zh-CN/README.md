@@ -3,6 +3,7 @@
 [English documentation](../../README.md) | 简体中文
 
 - [项目介绍、安装与使用](../../README.zh-CN.md)
+- [Virtual Commit 使用指南](virtual-commits.md)
 - [架构设计](architecture.md)
 - [贡献指南](CONTRIBUTING.md)
 - [安全策略](SECURITY.md)

@@ -1,6 +1,6 @@
 const emailPattern = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/giu;
 const loopbackUrlPattern = /https?:\/\/(?:127\.0\.0\.1|localhost):\d+(?:\/[^\s"'<>\\]*)?/giu;
-const tokenizedReviewPathPattern = /\/[A-Z0-9_-]{20,}\/(review|real)\b/giu;
+const tokenizedReviewPathPattern = /\/[A-Z0-9_-]{20,}\/(review|real|virtual-review)\b/giu;
 const workstationPathPattern = /(?:\/home\/|\/Users\/)[A-Z0-9._-]+(?:\/[^\s"'<>\\]*)?/giu;
 
 export const publicTestReport = (value) => String(JSON.stringify(value, null, 2) ?? "")
