@@ -69,6 +69,7 @@ bin/local-mr virtual-commit
 - `src/virtual-review-server.mjs` adapts immutable virtual-review data into the shared `src/review-ui.html` page, ordered single/range selections, file/context/preview endpoints, revision history with exact source commits, and progress state.
 - `src/virtual-review-cli.mjs` implements the machine-readable `snapshot`, `show`, `create`, `open`, `list`, `delete`, `prune`, and explicit Skill-installation commands.
 - `bin/local-mr` owns CLI arguments, target-branch detection, installation-layout compatibility, and browser launch.
+- `scripts/build-demo.mjs` runs the production Virtual Commit pipeline against the repository's init and feature commits, publishes Overview and Deep revisions, and freezes the resulting review as a self-contained GitHub Pages site.
 
 ## Snapshots and caches
 
@@ -96,6 +97,12 @@ The saved source is self-contained for the affected files, so its review remains
 
 The bundled `local-mr-virtual-commits` Codex Skill owns the human-guided review depth and reading-order policy; it is not an engine dependency and is installed only through `local-mr virtual-commit install-skill codex [--force]`. This keeps model choice, grouping granularity, and reading strategy outside the deterministic snapshot, validation, persistence, and rendering core.
 
+## Self-review Demo
+
+The public Demo is not a hand-written mock. Its Real side compares this repository's init commit with the commit that introduced Virtual Commits. The same frozen source is then passed through the production manifest validator and materializer twice: revision 1 provides a six-step Overview, while revision 2 provides a fourteen-step Deep review. Both start with documentation and leave release metadata until the end.
+
+The builder proves that each revision's final tree equals the Real commit and that its complete patch is byte-for-byte equivalent to the Real comparison before writing any static pages. It pre-generates Single commit and Commit range routes, both Diff layouts, file fragments, expanded context, and Markdown previews. The result can run without a local server, but it uses the same `src/review-ui.html` and rendering code as the CLI rather than a second Demo UI.
+
 ## Security boundaries
 
 - The server listens on the loopback interface and prefixes every application route with a random token. Ready-file permissions are `0600`.
@@ -113,4 +120,5 @@ The bundled `local-mr-virtual-commits` Codex Skill owns the human-guided review 
 - Virtual-review unit tests cover block parsing and materialization, strict manifest conservation, immutable revisions, revision-local progress, and content-addressed storage.
 - Integration tests use real temporary Git repositories to cover the CLI, caches, HTTP ranges, installation and uninstallation, and concurrent state writes.
 - Browser tests use headless Chrome to cover syntax highlighting, Markdown sanitization, Mermaid, side-by-side and line-by-line diffs, context expansion, navigation, and equivalent Real/Virtual rendering through the shared workspace.
+- Demo regression tests verify both revisions, Real/Virtual switching, Single commit and complete Commit range routes, repository links, and the frozen source metadata.
 - GitHub CI runs core checks on Node.js 22 and 24 and Chrome regressions on Ubuntu 24.04.

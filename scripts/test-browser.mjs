@@ -19,3 +19,4 @@ run("markdown-mermaid-regression.mjs");
 run("context-expansion-regression.mjs", ["--side"]);
 run("context-expansion-regression.mjs", ["--line"]);
 run("virtual-review-ui-regression.mjs");
+run("demo-regression.mjs");

@@ -263,6 +263,77 @@
         color: var(--lm-muted);
       }
 
+      .local-mr-demo-badge {
+        flex: 0 0 auto;
+        margin-left: 4px;
+        padding: 4px 7px;
+        border: 1px solid color-mix(in srgb, var(--lm-accent) 38%, var(--lm-border));
+        border-radius: 999px;
+        background: var(--lm-accent-soft);
+        color: var(--lm-accent);
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+      }
+
+      .local-mr-demo-layouts {
+        display: inline-flex;
+        flex: 0 0 auto;
+        overflow: hidden;
+        border: 1px solid var(--lm-border);
+        border-radius: 4px;
+      }
+
+      .local-mr-demo-layout,
+      .local-mr-demo-repository {
+        color: var(--lm-muted);
+        font-size: 11px;
+        text-decoration: none;
+      }
+
+      .local-mr-demo-layout {
+        padding: 5px 8px;
+        border-right: 1px solid var(--lm-border);
+      }
+
+      .local-mr-demo-layout:last-child {
+        border-right: 0;
+      }
+
+      .local-mr-demo-layout:hover,
+      .local-mr-demo-layout.local-mr-selected {
+        background: var(--lm-accent-soft);
+        color: var(--lm-accent);
+      }
+
+      .local-mr-demo-repository {
+        display: inline-flex;
+        flex: 0 0 auto;
+        padding: 4px 7px;
+        align-items: center;
+        gap: 5px;
+        border: 1px solid var(--lm-border);
+        border-radius: 4px;
+        background: var(--lm-panel);
+        color: var(--lm-text);
+        font-weight: 600;
+        line-height: 1.2;
+        white-space: nowrap;
+      }
+
+      .local-mr-demo-repository::before {
+        content: "☆";
+        font-size: 14px;
+        font-weight: 400;
+        line-height: 1;
+      }
+
+      .local-mr-demo-repository:hover {
+        border-color: color-mix(in srgb, var(--lm-text) 24%, var(--lm-border));
+        background: var(--lm-hover);
+        color: var(--lm-text);
+      }
+
       .local-mr-summary {
         display: flex;
         margin-left: auto;
@@ -508,6 +579,17 @@
         height: 32px;
         flex: 0 0 auto;
         align-items: center;
+      }
+
+      .local-mr-demo-hint {
+        min-width: 0;
+        margin-left: 12px;
+        flex: 1 1 auto;
+        overflow: hidden;
+        color: var(--lm-muted);
+        font-size: 11px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       .local-mr-version-control {
@@ -1780,7 +1862,8 @@
         }
 
         .local-mr-virtual-progress,
-        .local-mr-virtual-action {
+        .local-mr-virtual-action,
+        .local-mr-demo-hint {
           display: none;
         }
 
@@ -1842,6 +1925,17 @@
           border-color: var(--lm-accent);
           background: var(--lm-selected);
           color: var(--lm-accent);
+        }
+
+        body.local-mr-demo > h1 .local-mr-branch,
+        body.local-mr-demo > h1 .local-mr-arrow,
+        body.local-mr-demo > h1 .local-mr-demo-layouts,
+        body.local-mr-demo > h1 .local-mr-demo-repository {
+          display: none;
+        }
+
+        body.local-mr-demo > h1 .local-mr-demo-badge {
+          margin-left: 0;
         }
 
         .local-mr-version-bar {
@@ -1972,6 +2066,7 @@
       (() => {
         let activeSession;
         let versionNavigationSequence = 0;
+        let staticPopstateInstalled = false;
         const libraryLoads = new Map();
 
         const selectionsMatch = (left, right) => Boolean(
@@ -1993,8 +2088,20 @@
           }
         };
 
-        const reviewUrlForSelection = (versionData, selection) => {
-          const url = new URL(versionData.reviewUrl, document.baseURI);
+        const selectionFromLocation = (versionData) => {
+          const parameters = new URL(location.href).searchParams;
+          const selection = {
+            mode: parameters.get("mode"),
+            from: parameters.get("from"),
+            to: parameters.get("to"),
+          };
+          return selection.mode && selection.from && selection.to
+            ? selection
+            : versionData?.defaultSelection || null;
+        };
+
+        const reviewUrlForSelection = (versionData, selection, source = versionData.reviewUrl) => {
+          const url = new URL(source, document.baseURI);
           url.searchParams.set("mode", selection.mode);
           url.searchParams.set("from", selection.from);
           url.searchParams.set("to", selection.to);
@@ -2003,9 +2110,18 @@
         };
 
         const reviewDataUrlForSelection = (versionData, selection) => {
-          const url = new URL(versionData.reviewDataUrl, document.baseURI);
-          const reviewUrl = reviewUrlForSelection(versionData, selection);
-          url.search = reviewUrl.search;
+          const staticPattern = versionData.reviewDataPattern;
+          const source = staticPattern
+            ? staticPattern
+              .replace("{mode}", encodeURIComponent(selection.mode))
+              .replace("{from}", encodeURIComponent(selection.from))
+              .replace("{to}", encodeURIComponent(selection.to))
+            : versionData.reviewDataUrl;
+          const url = new URL(source, document.baseURI);
+          if (!staticPattern) {
+            const reviewUrl = reviewUrlForSelection(versionData, selection);
+            url.search = reviewUrl.search;
+          }
           return url;
         };
 
@@ -2201,6 +2317,37 @@
           diff.insertAdjacentElement("beforebegin", warning);
           return warning;
         };
+        if (versionData?.reviewDataPattern) {
+          if (!staticPopstateInstalled) {
+            staticPopstateInstalled = true;
+            window.addEventListener("popstate", () => {
+              const { value: currentVersionData } = readVersionData();
+              const requested = selectionFromLocation(currentVersionData);
+              if (
+                currentVersionData?.reviewDataPattern
+                && requested
+                && !selectionsMatch(requested, currentVersionData.selection)
+              ) {
+                void initializeReview();
+              }
+            });
+          }
+          const requested = selectionFromLocation(versionData);
+          if (requested && !selectionsMatch(requested, versionData.selection)) {
+            body.classList.add("local-mr-version-loading");
+            document.documentElement.classList.remove("local-mr-ready");
+            try {
+              const payload = await fetchVersionPayload(versionData, requested, signal);
+              replaceReviewPayload(payload);
+              await initializeReview();
+              return;
+            } catch (error) {
+              if (error.name === "AbortError") return;
+              console.error("Local MR could not restore the selected demo version", error);
+              history.replaceState(null, "", reviewUrlForSelection(versionData, versionData.selection));
+            }
+          }
+        }
         const readTokensPromise = versionData?.readStateUrl
           ? fetch(versionData.readStateUrl, { headers: { Accept: "application/json" } })
             .then((response) => {
@@ -2285,18 +2432,35 @@
           container.textContent = "";
           container.append(makeSpan("local-mr-preview-loading", "Generating Markdown preview…"));
           try {
-            const previewUrl = new URL(versionData.previewUrl, document.baseURI);
-            previewUrl.searchParams.set("mode", versionData.selection.mode);
-            previewUrl.searchParams.set("from", versionData.selection.from);
-            previewUrl.searchParams.set("to", versionData.selection.to);
-            previewUrl.searchParams.set("patch", versionData.patchId);
-            previewUrl.searchParams.set("path", filePath);
-            const previewPayload = fetch(previewUrl, { headers: { Accept: "application/json" } })
-              .then(async (response) => {
-                const payload = await response.json();
-                if (!response.ok) throw new Error(payload.error || "Could not read Markdown file");
-                return payload;
-              });
+            const embeddedPreview = versionData?.embeddedPreviews?.[filePath];
+            const staticPreviewUrl = versionData?.previewUrls?.[filePath];
+            const previewPayload = typeof embeddedPreview === "string"
+              ? Promise.resolve({ content: embeddedPreview })
+              : staticPreviewUrl
+                ? fetch(new URL(staticPreviewUrl, document.baseURI), {
+                    headers: { Accept: "application/json" },
+                    signal,
+                  }).then(async (response) => {
+                    const payload = await response.json();
+                    if (!response.ok || typeof payload.content !== "string") {
+                      throw new Error(payload.error || "Could not read static Markdown file");
+                    }
+                    return payload;
+                  })
+              : (() => {
+                const previewUrl = new URL(versionData.previewUrl, document.baseURI);
+                previewUrl.searchParams.set("mode", versionData.selection.mode);
+                previewUrl.searchParams.set("from", versionData.selection.from);
+                previewUrl.searchParams.set("to", versionData.selection.to);
+                previewUrl.searchParams.set("patch", versionData.patchId);
+                previewUrl.searchParams.set("path", filePath);
+                return fetch(previewUrl, { headers: { Accept: "application/json" } })
+                  .then(async (response) => {
+                    const payload = await response.json();
+                    if (!response.ok) throw new Error(payload.error || "Could not read Markdown file");
+                    return payload;
+                  });
+              })();
             const [payload] = await Promise.all([
               previewPayload,
               loadLibrary(versionData.assets.marked, "marked"),
@@ -2533,6 +2697,7 @@
                 reviewNavigation.active === "real"
                 && item.source === "virtual"
                 && available
+                && !versionData.demo
               ) {
                 const syncRealReturn = () => {
                   try {
@@ -2936,6 +3101,9 @@
             versionBar.append(progress);
           }
 
+          if (versionData.demo?.hint) {
+            versionBar.append(makeSpan("local-mr-demo-hint", versionData.demo.hint));
+          }
           heading.insertAdjacentElement("afterend", versionBar);
           body.classList.add("local-mr-has-version-bar");
           document.addEventListener("click", () => closeMenus(), { signal });
@@ -3007,6 +3175,35 @@
           makeSpan("local-mr-arrow", "→"),
           makeSpan("local-mr-branch local-mr-target", targetBranch),
         );
+
+        body.classList.toggle("local-mr-demo", Boolean(versionData?.demo));
+        if (versionData?.demo) {
+          heading.append(makeSpan("local-mr-demo-badge", versionData.demo.label || "DEMO"));
+          if (Array.isArray(versionData.demo.layouts)) {
+            const layouts = document.createElement("span");
+            layouts.className = "local-mr-demo-layouts";
+            versionData.demo.layouts.forEach((layout) => {
+              const link = document.createElement("a");
+              link.className = "local-mr-demo-layout";
+              link.classList.toggle("local-mr-selected", Boolean(layout.selected));
+              link.href = versionData.reviewDataPattern
+                ? reviewUrlForSelection(versionData, versionData.selection, layout.url).href
+                : new URL(layout.url, document.baseURI).href;
+              link.textContent = layout.label;
+              layouts.append(link);
+            });
+            heading.append(layouts);
+          }
+          if (versionData.demo.repositoryUrl) {
+            const repository = document.createElement("a");
+            repository.className = "local-mr-demo-repository";
+            repository.href = versionData.demo.repositoryUrl;
+            repository.target = "_blank";
+            repository.rel = "noopener noreferrer";
+            repository.textContent = versionData.demo.repositoryLabel || "Star on GitHub ↗";
+            heading.append(repository);
+          }
+        }
 
         const fileItems = [...sidebar.querySelectorAll(".d2h-file-list-line")];
         const hideZeroLineCounts = (container) => {
@@ -3244,7 +3441,36 @@
           button.addEventListener("click", onClick);
           return button;
         };
+        const staticContextCache = new Map();
         const fetchContextLines = async (entry, start, end) => {
+          const embeddedLines = versionData?.embeddedContext?.[entry.filePatchId];
+          const staticContextUrl = versionData?.contextUrls?.[entry.filePatchId];
+          let staticLines = staticContextCache.get(staticContextUrl);
+          if (staticContextUrl && !staticLines) {
+            const response = await fetch(new URL(staticContextUrl, document.baseURI), {
+              headers: { Accept: "application/json" },
+              signal,
+            });
+            const payload = await response.json();
+            if (!response.ok || !Array.isArray(payload.lines)) {
+              throw new Error(payload.error || `Could not load static Diff context: ${response.status}`);
+            }
+            staticLines = payload.lines;
+            staticContextCache.set(staticContextUrl, staticLines);
+          }
+          const availableLines = Array.isArray(embeddedLines) ? embeddedLines : staticLines;
+          if (Array.isArray(availableLines)) {
+            const boundedStart = Math.max(1, start);
+            const boundedEnd = Math.min(end, availableLines.length);
+            return {
+              start: boundedStart,
+              end: boundedEnd,
+              lines: boundedStart <= boundedEnd
+                ? availableLines.slice(boundedStart - 1, boundedEnd)
+                : [],
+              hasMore: boundedEnd < availableLines.length,
+            };
+          }
           if (!versionData?.contextUrl) throw new Error("The diff context URL is missing");
           const contextUrl = new URL(versionData.contextUrl, document.baseURI);
           contextUrl.searchParams.set("mode", versionData.selection.mode);
@@ -3272,8 +3498,12 @@
         const prepareContextExpansion = (entry, wrapper) => {
           if (!wrapper || wrapper.dataset.localMrContextPrepared === "true") return;
           wrapper.dataset.localMrContextPrepared = "true";
+          const hasEmbeddedContext = Array.isArray(
+            versionData?.embeddedContext?.[entry?.filePatchId],
+          );
+          const hasStaticContext = typeof versionData?.contextUrls?.[entry?.filePatchId] === "string";
           if (
-            !versionData?.contextUrl
+            (!versionData?.contextUrl && !hasEmbeddedContext && !hasStaticContext)
             || !entry?.filePatchId
             || entry.status === "added"
             || entry.status === "deleted"
@@ -3601,10 +3831,12 @@
           }
           const actions = document.createElement("div");
           actions.className = "local-mr-file-actions";
+          const hasEmbeddedPreview = typeof versionData?.embeddedPreviews?.[previewPath] === "string";
+          const hasStaticPreview = typeof versionData?.previewUrls?.[previewPath] === "string";
           if (
             !deleted
             && /\.(?:md|markdown|mdown|mkd)$/i.test(previewPath)
-            && versionData?.previewUrl
+            && (versionData?.previewUrl || hasEmbeddedPreview || hasStaticPreview)
           ) {
             const currentDiff = () => wrapper.querySelector(
               ".local-mr-split-diff, .d2h-file-diff, .d2h-files-diff",
@@ -3757,13 +3989,18 @@
         const loadWrapper = async (id) => {
           const loaded = wrappersById.get(id);
           if (loaded) return loaded;
-          if (!versionData?.fragmentUrl) throw new Error("The file diff URL is missing");
-          const fragmentUrl = new URL(versionData.fragmentUrl, document.baseURI);
-          fragmentUrl.searchParams.set("mode", versionData.selection.mode);
-          fragmentUrl.searchParams.set("from", versionData.selection.from);
-          fragmentUrl.searchParams.set("to", versionData.selection.to);
-          fragmentUrl.searchParams.set("patch", versionData.patchId);
-          fragmentUrl.searchParams.set("id", id);
+          const staticFragment = versionData?.fragmentUrls?.[id];
+          if (!staticFragment && !versionData?.fragmentUrl) {
+            throw new Error("The file diff URL is missing");
+          }
+          const fragmentUrl = new URL(staticFragment || versionData.fragmentUrl, document.baseURI);
+          if (!staticFragment) {
+            fragmentUrl.searchParams.set("mode", versionData.selection.mode);
+            fragmentUrl.searchParams.set("from", versionData.selection.from);
+            fragmentUrl.searchParams.set("to", versionData.selection.to);
+            fragmentUrl.searchParams.set("patch", versionData.patchId);
+            fragmentUrl.searchParams.set("id", id);
+          }
           const response = await fetch(fragmentUrl, {
             headers: { Accept: "text/html" },
             signal,

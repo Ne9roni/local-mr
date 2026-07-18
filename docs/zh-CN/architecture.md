@@ -69,6 +69,7 @@ bin/local-mr virtual-commit
 - `src/virtual-review-server.mjs`：把不可变虚拟审查数据适配到共享的 `src/review-ui.html` 页面，包括有序的单 commit/连续范围选择、文件/context/preview 端点、带精确 source commit 的 revision 历史和进度状态。
 - `src/virtual-review-cli.mjs`：实现机器可读的 `snapshot`、`show`、`create`、`open`、`list`、`delete`、`prune` 和显式 Skill 安装命令。
 - `bin/local-mr`：负责 CLI 参数、目标分支探测、安装布局兼容和浏览器打开。
+- `scripts/build-demo.mjs`：用生产环境的 Virtual Commit 流程处理本仓库的 init 与功能 commit，生成 Overview 和 Deep 两个 revision，并把结果冻结成自包含的 GitHub Pages 站点。
 
 ## 快照与缓存
 
@@ -96,6 +97,12 @@ Real 与 Virtual 审查仍由两个独立的回环服务提供。虚拟服务中
 
 项目内置的 `local-mr-virtual-commits` Codex Skill 负责与人类协商评审深度和阅读顺序；它不是内核依赖，只能通过 `local-mr virtual-commit install-skill codex [--force]` 显式安装。这样模型选择、分组粒度和阅读策略位于确定性的快照、校验、持久化与渲染内核之外。
 
+## 自审 Demo
+
+公开 Demo 不是手写的假页面。Real 侧比较本仓库的 init commit 与引入 Virtual Commits 的功能 commit；同一份冻结 source 随后两次通过生产环境的 manifest 校验与物化流程：revision 1 是 6 步 Overview，revision 2 是 14 步 Deep review。两版都先读文档，最后再处理发布元数据。
+
+生成器会先证明每个 revision 的最终文件树等于 Real commit，并且完整 patch 与 Real 比较逐字节一致，然后才写入静态页面。它会预生成 Single commit、Commit range、两种 Diff 布局、文件片段、展开上下文和 Markdown 预览。最终站点不需要本地服务，但仍复用 CLI 使用的 `src/review-ui.html` 与渲染代码，而不是维护第二套 Demo UI。
+
 ## 安全边界
 
 - 服务监听回环地址，并在所有业务路径前加入随机令牌；ready 文件权限为 `0600`。
@@ -113,4 +120,5 @@ Real 与 Virtual 审查仍由两个独立的回环服务提供。虚拟服务中
 - 虚拟审查单元测试覆盖变更块解析与物化、严格 manifest 守恒、不可变 revision、revision 独立进度和内容寻址存储。
 - 集成测试在临时真实 Git 仓库中覆盖 CLI、缓存、HTTP 范围、安装/卸载和并发状态写入。
 - 浏览器测试使用 headless Chrome 覆盖语法高亮、Markdown 清洗、Mermaid、双栏/单栏 Diff、上下文展开、导航，以及 Real/Virtual 通过共享工作区得到的等价渲染。
+- Demo 回归测试覆盖两个 revision、Real/Virtual 切换、Single commit 与完整 Commit range、仓库链接和冻结 source 元数据。
 - GitHub CI 在 Node.js 22/24 上运行核心检查，并在 Ubuntu 24.04 上运行 Chrome 回归。

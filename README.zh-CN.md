@@ -3,6 +3,7 @@
 [English](README.md) | 简体中文
 
 [![CI](https://github.com/Ne9roni/local-mr/actions/workflows/ci.yml/badge.svg)](https://github.com/Ne9roni/local-mr/actions/workflows/ci.yml)
+[![在线 Demo](https://img.shields.io/badge/demo-live-0969da?logo=githubpages&logoColor=white)](https://ne9roni.github.io/local-mr/)
 [![MIT License](https://img.shields.io/badge/license-MIT-2da44e.svg)](LICENSE)
 
 **AI 写了一大坨 AI slop。MR 上挂的还是你的名字。**
@@ -48,6 +49,14 @@ local-mr virtual-commit install-skill codex
 ```
 
 浏览器会在普通 Diff 工作区打开这条路线，提供 **Real / Virtual** 切换、Single commit 与 Commit range、前后导航、风险与评审重点、不可变 revision 和已评审进度。完整流程见下方的 [Virtual Commit 参考](#virtual-commit-参考)，manifest 与 JSON CLI 见[专项指南](docs/zh-CN/virtual-commits.md)。
+
+## 看 local-mr 审自己的 AI slop
+
+[交互式 Demo](https://ne9roni.github.io/local-mr/) 直接由这个仓库最前面的两个 commit 生成。Real 会把整套 Virtual Commit 实现显示成一个 AI 尺寸的大 commit；Virtual 则把完全相同的 Diff 整理成 6 步 Overview 或 14 步 Deep review——文档先读，发布元数据最后看。同一份代码，只是不用再摆出校对电话簿的表情。
+
+[![local-mr 正在评审自己的 Virtual Commit 实现](docs/assets/local-mr-demo.png)](https://ne9roni.github.io/local-mr/)
+
+[打开 Demo →](https://ne9roni.github.io/local-mr/) 你可以切换 Real / Virtual、revision 和范围，展开上下文、预览 Markdown；如果 local-mr 值得一个 Star，页面里的仓库链接正好顺手。
 
 ## 为什么用 local-mr？
 
@@ -232,7 +241,7 @@ npm ci
 npm run verify
 ```
 
-`npm run verify` 会运行语法检查、单元与集成测试和真实 Chrome 回归。GitHub Actions 会在 Node.js 22 和 24 上运行核心检查。
+`npm run verify` 会运行语法检查、单元与集成测试、静态 Demo 校验和真实 Chrome 回归。Demo 固定使用本仓库最前面的两个 commit，因此浅克隆的开发目录需要先补齐完整历史。GitHub Actions 会在 Node.js 22 和 24 上运行核心检查。
 
 版本模型、缓存失效、运行时路径和安全边界见[中文架构文档](docs/zh-CN/architecture.md)。完整贡献流程见[中文贡献指南](docs/zh-CN/CONTRIBUTING.md)，版本记录见[中文 Changelog](docs/zh-CN/CHANGELOG.md)。
 

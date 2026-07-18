@@ -1,0 +1,1 @@
+{"content":"# 简体中文文档\n\n[English documentation](../../README.md) | 简体中文\n\n- [项目介绍、安装与使用](../../README.zh-CN.md)\n- [Virtual Commit 使用指南](virtual-commits.md)\n- [架构设计](architecture.md)\n- [贡献指南](CONTRIBUTING.md)\n- [安全策略](SECURITY.md)\n- [变更日志](CHANGELOG.md)\n\n代码标识符、命令、环境变量和文件路径保留英文，以便与实现及终端输出保持一致。\n"}

@@ -3,6 +3,7 @@
 English | [简体中文](README.zh-CN.md)
 
 [![CI](https://github.com/Ne9roni/local-mr/actions/workflows/ci.yml/badge.svg)](https://github.com/Ne9roni/local-mr/actions/workflows/ci.yml)
+[![Live demo](https://img.shields.io/badge/demo-live-0969da?logo=githubpages&logoColor=white)](https://ne9roni.github.io/local-mr/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-2da44e.svg)](LICENSE)
 
 **AI wrote a pile of AI slop. Your name is still on the MR.**
@@ -49,6 +50,14 @@ files last and open the review when it is ready.
 ```
 
 The browser opens the generated route in the normal Diff workspace with **Real / Virtual** switching, Single commit and Commit range modes, previous/next navigation, risk and review-focus guidance, immutable revisions, and reviewed progress. See [Virtual Commit reference](#virtual-commit-reference) for the complete workflow and [the dedicated guide](docs/virtual-commits.md) for the manifest and JSON CLI.
+
+## Watch local-mr review its own AI slop
+
+The [interactive Demo](https://ne9roni.github.io/local-mr/) is generated from this repository's first two commits. Real shows the entire Virtual Commit implementation as one AI-sized commit. Virtual turns that exact Diff into a six-step Overview or a fourteen-step Deep review—documentation first, release metadata last. Same code; fewer pages to stare at like you have been asked to proofread a phone book.
+
+[![local-mr reviewing its own Virtual Commit implementation](docs/assets/local-mr-demo.png)](https://ne9roni.github.io/local-mr/)
+
+[Open the Demo →](https://ne9roni.github.io/local-mr/) Switch between Real and Virtual, change revision and range, expand context, preview Markdown, then use the repository link there if local-mr earned a Star.
 
 ## Why local-mr?
 
@@ -233,7 +242,7 @@ npm ci
 npm run verify
 ```
 
-`npm run verify` runs syntax checks, unit and integration tests, and the real Chrome regression suite. GitHub Actions runs the core checks on Node.js 22 and 24.
+`npm run verify` runs syntax checks, unit and integration tests, static Demo verification, and the real Chrome regression suite. The Demo is pinned to this repository's first two commits, so shallow development checkouts must fetch the complete history. GitHub Actions runs the core checks on Node.js 22 and 24.
 
 See [the architecture guide](docs/architecture.md) for version modeling, cache invalidation, runtime paths, and security boundaries. See [CONTRIBUTING.md](CONTRIBUTING.md) for the complete contributor workflow and [CHANGELOG.md](CHANGELOG.md) for release history.
 

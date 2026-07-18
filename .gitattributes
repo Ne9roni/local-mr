@@ -2,3 +2,4 @@
 
 *.png binary
 *.svg text eol=lf
+demo/assets/mermaid.js -diff

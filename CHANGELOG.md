@@ -7,5 +7,6 @@ English | [简体中文](docs/zh-CN/CHANGELOG.md)
 - Review committed changes, contiguous commit ranges, and an explicitly selected worktree checkpoint in one local browser workspace.
 - Switch between Real commits and immutable Virtual Commit revisions without changing Git history.
 - Organize large or AI-produced diffs as Overview or Deep review routes while enforcing exact block conservation and final-tree equality.
+- Explore the same Virtual Commit feature diff as one Real commit, a six-step Overview, or a fourteen-step Deep review in a self-hosted static Demo.
 - Render lazy side-by-side or line-by-line diffs with language-aware highlighting, expandable context, Markdown, and Mermaid previews.
 - Keep source, review state, and tokenized review pages local, with Gitleaks history scanning in CI and an optional staged hook for contributors.

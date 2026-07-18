@@ -14,12 +14,22 @@
     "LICENSE",
     "THIRD_PARTY_NOTICES.md"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ne9roni/local-mr.git"
+  },
+  "homepage": "https://ne9roni.github.io/local-mr/",
+  "bugs": {
+    "url": "https://github.com/Ne9roni/local-mr/issues"
+  },
   "type": "module",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "check": "npm run lint && npm test",
+    "build:demo": "node scripts/build-demo.mjs",
+    "check": "npm run lint && npm run check:demo && npm test",
+    "check:demo": "node scripts/build-demo.mjs --check",
     "verify": "npm run check && npm run test:browser",
     "lint": "node scripts/check-syntax.mjs",
     "test": "npm run test:unit && npm run test:integration",

@@ -27,12 +27,14 @@ git config --local core.hooksPath .githooks
 - `npm run test:unit`：验证版本模型和服务端渲染等纯逻辑。
 - `npm run test:integration`：使用临时 Git 仓库验证 CLI、HTTP、缓存、安装和状态持久化。
 - `npm run test:browser`：使用 headless Chrome 验证 Markdown、Mermaid 和 Diff 交互。
-- `npm run check`：运行 lint、单元测试和集成测试。
+- `npm run build:demo`：根据仓库最前面的两个 commit 重新生成静态自审 Demo。
+- `npm run check:demo`：校验已提交 Demo 是否与干净重建结果一致。
+- `npm run check`：运行 lint、Demo 校验、单元测试和集成测试。
 - `npm run verify`：在此基础上增加浏览器测试。
 
 GitHub CI 还会使用 Gitleaks 扫描完整 Git 历史；可选的 pre-commit hook 会在生成 commit 前扫描暂存区。
 
-修改时优先在公开边界补测试：CLI、HTTP 响应或真实浏览器行为。纯文档改动至少运行 `npm run check`；涉及 UI、渲染或 Markdown 时运行 `npm run verify`。
+修改时优先在公开边界补测试：CLI、HTTP 响应或真实浏览器行为。纯文档改动至少运行 `npm run check`；涉及 UI、渲染或 Markdown 时运行 `npm run verify`。共享 review UI、渲染器或 Demo 计划发生变化时，必须一并重新生成 Demo。生成器需要仓库最前面的两个 commit，因此浅克隆环境需先补齐完整历史。
 
 ## 约定
 
