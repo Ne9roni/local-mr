@@ -148,6 +148,11 @@ try {
                 .map((button) => button.title),
             secondHunkDirections: [...secondHunk.querySelectorAll(".local-mr-context-button")]
                 .map((button) => button.dataset.direction),
+            secondHunkAreas: [...secondHunk.querySelectorAll(".local-mr-context-button")]
+                .map((button) => secondHunk.cells[0]?.contains(button) ? "gutter" : "content"),
+            fileToggleTitle: wrapper.querySelector(".local-mr-file-context-toggle")?.title,
+            fileToggleBesideName: wrapper.querySelector(".local-mr-file-context-toggle")
+                ?.nextElementSibling?.classList.contains("d2h-file-name") === true,
             hunkMetrics: contextRows.map((row) => ({
                 height: Math.round(row.getBoundingClientRect().height),
                 display: getComputedStyle(row).display,
@@ -162,7 +167,8 @@ try {
             })),
         };
     })()`);
-    if (process.env.LOCAL_MR_CONTEXT_SCREENSHOT) {
+    const captureScreenshot = async (outputPath) => {
+        if (!outputPath) return;
         await command("Page.enable");
         await command("Emulation.setDeviceMetricsOverride", {
             width: 1600,
@@ -175,11 +181,36 @@ try {
             format: "png",
             captureBeyondViewport: false,
         });
-        fs.writeFileSync(
-            process.env.LOCAL_MR_CONTEXT_SCREENSHOT,
-            Buffer.from(screenshot.data, "base64"),
-        );
-    }
+        fs.writeFileSync(outputPath, Buffer.from(screenshot.data, "base64"));
+    };
+    await captureScreenshot(process.env.LOCAL_MR_CONTEXT_SCREENSHOT);
+    await evaluate(String.raw`(() => {
+        const wrapper = document.querySelector(".d2h-file-wrapper:not([hidden])");
+        const secondHunk = [...wrapper.querySelectorAll("tr")]
+            .find((row) => row.textContent.includes("@@ -47,7 +47,7 @@"));
+        secondHunk.querySelector('.local-mr-context-button[data-direction="down"]').click();
+    })()`);
+    await waitFor(
+        "Boolean(document.querySelector('.d2h-file-wrapper:not([hidden]) .local-mr-expanded-context[data-old-line=" + '"9"' + "]'))"
+            + " && Boolean(document.querySelector('.d2h-file-wrapper:not([hidden]) .local-mr-expanded-context[data-old-line=" + '"28"' + "]'))",
+        "first internal context batch",
+    );
+    const partial = await evaluate(String.raw`(() => {
+        const wrapper = document.querySelector(".d2h-file-wrapper:not([hidden])");
+        const secondHunk = [...wrapper.querySelectorAll("tr")]
+            .find((row) => row.textContent.includes("@@ -47,7 +47,7 @@"));
+        secondHunk?.scrollIntoView({ block: "center", inline: "nearest" });
+        return {
+            hunkPresent: Boolean(secondHunk),
+            directions: [...(secondHunk?.querySelectorAll(".local-mr-context-button") || [])]
+                .map((button) => button.dataset.direction),
+            firstRemainingLineHidden: !wrapper.querySelector(
+                '.local-mr-expanded-context[data-old-line="29"]',
+            ),
+        };
+    })()`);
+    await delay(120);
+    await captureScreenshot(process.env.LOCAL_MR_CONTEXT_PARTIAL_SCREENSHOT);
     await evaluate(String.raw`(() => {
         const wrapper = document.querySelector(".d2h-file-wrapper:not([hidden])");
         const secondHunk = [...wrapper.querySelectorAll("tr")]
@@ -187,14 +218,15 @@ try {
         secondHunk.querySelector('.local-mr-context-button[data-direction="all"]').click();
     })()`);
     await waitFor(
-        "Boolean(document.querySelector('.d2h-file-wrapper:not([hidden]) .local-mr-expanded-context[data-old-line=" + '"9"' + "]'))"
-            + " && Boolean(document.querySelector('.d2h-file-wrapper:not([hidden]) .local-mr-expanded-context[data-old-line=" + '"46"' + "]'))",
+        "Boolean(document.querySelector('.d2h-file-wrapper:not([hidden]) .local-mr-expanded-context[data-old-line=" + '"46"' + "]'))"
+            + " && ![...document.querySelectorAll('.d2h-file-wrapper:not([hidden]) tr')]"
+            + ".some((row) => row.textContent.includes('@@ -47,7 +47,7 @@'))",
         "whole internal context region",
     );
     await evaluate(String.raw`(() => {
         const wrapper = document.querySelector(".d2h-file-wrapper:not([hidden])");
         const firstHunk = [...wrapper.querySelectorAll("tr")]
-            .find((row) => row.textContent.includes("@@ -2,7 +2,7 @@"));
+            .find((row) => row.textContent.includes("@@ -2,"));
         firstHunk.querySelector('.local-mr-context-button[data-direction="all"]').click();
     })()`);
     await waitFor(
@@ -211,6 +243,11 @@ try {
         "!document.querySelector('.d2h-file-wrapper:not([hidden]) .local-mr-context-footer')",
         "end of file context",
     );
+    await evaluate(String.raw`document.querySelector(
+        '.d2h-file-wrapper:not([hidden]) .local-mr-expanded-context[data-old-line="46"]',
+    )?.scrollIntoView({ block: "center", inline: "nearest" })`);
+    await delay(120);
+    await captureScreenshot(process.env.LOCAL_MR_CONTEXT_EXPANDED_SCREENSHOT);
     const expanded = await evaluate(String.raw`(() => {
         const wrapper = document.querySelector(".d2h-file-wrapper:not([hidden])");
         const expandedRows = [...wrapper.querySelectorAll(".local-mr-expanded-context")];
@@ -222,9 +259,56 @@ try {
             middleText: wrapper.querySelector('[data-old-line="30"] .d2h-code-line-ctn')?.textContent,
             lastText: wrapper.querySelector('[data-old-line="100"] .d2h-code-line-ctn')?.textContent,
             contextRequestCount: resources.length,
+            decorationCount: wrapper.querySelectorAll(".local-mr-context-decoration").length,
+            fileToggleTitle: wrapper.querySelector(".local-mr-file-context-toggle")?.title,
             hunkLabels: [...wrapper.querySelectorAll(
                 ".d2h-info .d2h-code-side-line, .d2h-info .d2h-code-line",
             )].map((line) => line.textContent.trim()).filter((line) => line.includes("@@")),
+        };
+    })()`);
+    await evaluate(String.raw`document.querySelector(
+        ".d2h-file-wrapper:not([hidden]) .local-mr-file-context-toggle",
+    ).click()`);
+    await waitFor(
+        "document.querySelectorAll('.d2h-file-wrapper:not([hidden]) .local-mr-context-button').length === 5"
+            + " && !document.querySelector('.d2h-file-wrapper:not([hidden]) .local-mr-expanded-context')"
+            + " && document.querySelector('.d2h-file-wrapper:not([hidden]) .local-mr-file-context-toggle')?.title"
+            + " === 'Expand all omitted lines in this file'",
+        "collapsed context",
+    );
+    const collapsed = await evaluate(String.raw`(() => {
+        const wrapper = document.querySelector(".d2h-file-wrapper:not([hidden])");
+        return {
+            contextControls: wrapper.querySelectorAll(".local-mr-context-button").length,
+            decorationCount: wrapper.querySelectorAll(".local-mr-context-decoration").length,
+            expandedCount: wrapper.querySelectorAll(".local-mr-expanded-context").length,
+            fileToggleTitle: wrapper.querySelector(".local-mr-file-context-toggle")?.title,
+        };
+    })()`);
+    await delay(300);
+    const fileExpandRequestsBefore = await evaluate(String.raw`performance.getEntriesByType("resource")
+        .filter((entry) => entry.name.includes("/diff-context")).length`);
+    await evaluate(String.raw`document.querySelector(
+        ".d2h-file-wrapper:not([hidden]) .local-mr-file-context-toggle",
+    ).click()`);
+    await waitFor(
+        "document.querySelectorAll('.d2h-file-wrapper:not([hidden]) .local-mr-expanded-context').length === 86"
+            + " && !document.querySelector('.d2h-file-wrapper:not([hidden]) .local-mr-context-decoration')"
+            + " && !document.querySelector('.d2h-file-wrapper:not([hidden]) .local-mr-context-footer')"
+            + " && document.querySelector('.d2h-file-wrapper:not([hidden]) .local-mr-file-context-toggle')?.title"
+            + " === 'Collapse unchanged sections'",
+        "file-level context expansion",
+    );
+    const fileExpanded = await evaluate(`(() => {
+        const wrapper = document.querySelector(".d2h-file-wrapper:not([hidden])");
+        const requests = performance.getEntriesByType("resource")
+            .filter((entry) => entry.name.includes("/diff-context")).length;
+        return {
+            expandedCount: wrapper.querySelectorAll(".local-mr-expanded-context").length,
+            firstText: wrapper.querySelector('[data-old-line="1"] .d2h-code-line-ctn')?.textContent,
+            lastText: wrapper.querySelector('[data-old-line="100"] .d2h-code-line-ctn')?.textContent,
+            requestCount: requests - ${fileExpandRequestsBefore},
+            fileToggleTitle: wrapper.querySelector(".local-mr-file-context-toggle")?.title,
         };
     })()`);
     const controlsFor = async (fileName) => {
@@ -238,7 +322,13 @@ try {
             `document.querySelector('.d2h-file-wrapper:not([hidden])')?.id === ${JSON.stringify(id)}`,
             `${fileName} diff`,
         );
-        return evaluate("document.querySelectorAll('.d2h-file-wrapper:not([hidden]) .local-mr-context-button').length");
+        return evaluate(`(() => {
+            const wrapper = document.querySelector('.d2h-file-wrapper:not([hidden])');
+            return {
+                contextControls: wrapper.querySelectorAll('.local-mr-context-button').length,
+                hasFileToggle: Boolean(wrapper.querySelector('.local-mr-file-context-toggle')),
+            };
+        })()`);
     };
     const addedControls = await controlsFor("added.txt");
     const deletedControls = await controlsFor("deleted.txt");
@@ -256,29 +346,53 @@ try {
 
     const checks = {
         "context endpoint is advertised": initial.hasContextUrl,
+        "file header exposes current-file expansion beside its name": initial.fileToggleTitle
+            === "Expand all omitted lines in this file" && initial.fileToggleBesideName,
         "small, large, and trailing gaps expose context controls": initial.titles.length === 5
             && initial.titles.filter((title) => title === "Expand this section").length === 2
             && initial.titles.filter((title) => title === "Expand 20 lines downward").length === 2
             && initial.titles.filter((title) => title === "Expand 20 lines upward").length === 1,
-        "large internal gaps offer down, up, and all actions": initial.secondHunkDirections.join(",")
-            === "down,up,all",
+        "large internal gaps match Ali Code control placement": initial.secondHunkDirections.join(",")
+            === "down,up,all" && initial.secondHunkAreas.join(",") === "gutter,gutter,content",
         "context controls remain compact": initial.hunkMetrics.every((metric) => metric.height <= 32),
+        "partial expansion keeps the remaining hunk range": partial.hunkPresent
+            && partial.directions.join(",") === "all"
+            && partial.firstRemainingLineHidden,
         "expanded lines preserve content and cover the whole file": expanded.expandedCount === 86
             && expanded.firstText === "base line 1"
             && expanded.middleText === "base line 30"
             && expanded.lastText === "base line 100"
-            && expanded.hunkLabels.some((label) => label.startsWith("@@ -1,8 +1,8 @@"))
-            && expanded.hunkLabels.some((label) => label.startsWith("@@ -9,92 +9,92 @@")),
-        "each expansion fetches only its requested range": expanded.contextRequestCount === 5,
-        "added and deleted files do not expose expansion": addedControls === 0 && deletedControls === 0,
-        "modified files with an empty base have no invalid expansion": emptyControls === 0
+            && expanded.decorationCount === 0
+            && expanded.hunkLabels.length === 0
+            && expanded.fileToggleTitle === "Collapse unchanged sections",
+        "each expansion fetches only its requested range": expanded.contextRequestCount === 6,
+        "expanded context can be collapsed back to omitted sections": collapsed.contextControls === 5
+            && collapsed.decorationCount === 2
+            && collapsed.expandedCount === 0
+            && collapsed.fileToggleTitle === "Expand all omitted lines in this file",
+        "file header expands every omitted section in one action": fileExpanded.expandedCount === 86
+            && fileExpanded.firstText === "base line 1"
+            && fileExpanded.lastText === "base line 100"
+            && fileExpanded.requestCount === 3
+            && fileExpanded.fileToggleTitle === "Collapse unchanged sections",
+        "added and deleted files do not expose expansion": addedControls.contextControls === 0
+            && !addedControls.hasFileToggle
+            && deletedControls.contextControls === 0
+            && !deletedControls.hasFileToggle,
+        "modified files with an empty base have no invalid expansion": emptyControls.contextControls === 0
+            && !emptyControls.hasFileToggle
             && !emptyHasFooter,
-        "files whose last hunk reaches EOF have no trailing control": endControls === 1 && !endHasFooter,
+        "files whose last hunk reaches EOF have no trailing control": endControls.contextControls === 1
+            && endControls.hasFileToggle
+            && !endHasFooter,
     };
     console.log(JSON.stringify({
         layout,
         initial,
+        partial,
         expanded,
+        collapsed,
+        fileExpanded,
         addedControls,
         deletedControls,
         emptyControls,

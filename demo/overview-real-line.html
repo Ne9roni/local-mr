@@ -1313,6 +1313,35 @@
         margin-right: 8px;
       }
 
+      .local-mr-file-context-toggle {
+        display: grid;
+        width: 24px;
+        height: 28px;
+        margin: 0 6px 0 -3px;
+        padding: 0;
+        flex: 0 0 24px;
+        place-items: center;
+        border: 0;
+        border-radius: 3px;
+        background: transparent;
+        color: var(--lm-muted);
+        cursor: pointer;
+        font: 650 15px/1 "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+        transition: background 120ms ease, color 120ms ease;
+      }
+
+      .local-mr-file-context-toggle:hover,
+      .local-mr-file-context-toggle:focus-visible {
+        background: var(--lm-hover);
+        color: var(--lm-accent);
+        outline: none;
+      }
+
+      .local-mr-file-context-toggle:disabled {
+        cursor: wait;
+        opacity: 0.55;
+      }
+
       .d2h-file-header .d2h-file-stats {
         align-items: center;
         gap: 0;
@@ -3528,6 +3557,66 @@
             .filter(Boolean);
           if (hunks.length === 0) return;
 
+          const originalBody = table.tBodies[0]?.cloneNode(true);
+          const gaps = [];
+          let expandTail = async () => {};
+          let tailPending = true;
+          let fileExpansionRunning = false;
+          const fileToggle = document.createElement("button");
+          fileToggle.type = "button";
+          fileToggle.className = "local-mr-file-context-toggle";
+          fileToggle.textContent = "↕";
+          const refreshFileToggle = () => {
+            const hasGap = gaps.some((gap) => gap.row.isConnected && gap.start <= gap.end);
+            const hasTail = Boolean(wrapper.querySelector(".local-mr-context-footer"));
+            const hasExpandedContext = Boolean(wrapper.querySelector(".local-mr-expanded-context"));
+            if (!hasGap && !hasTail && !hasExpandedContext) {
+              fileToggle.remove();
+              return;
+            }
+            if (!fileToggle.isConnected) {
+              wrapper.querySelector(".d2h-file-header .d2h-file-name")?.before(fileToggle);
+            }
+            const expanded = !hasGap && !hasTail && !tailPending;
+            fileToggle.dataset.state = expanded ? "expanded" : "collapsed";
+            fileToggle.title = expanded
+              ? "Collapse unchanged sections"
+              : "Expand all omitted lines in this file";
+            fileToggle.setAttribute("aria-label", fileToggle.title);
+          };
+          const expandFile = async () => {
+            if (fileExpansionRunning) return;
+            fileExpansionRunning = true;
+            fileToggle.disabled = true;
+            try {
+              for (const gap of gaps) {
+                if (gap.row.isConnected && gap.start <= gap.end) {
+                  const expandAll = gap.expand?.("all");
+                  if (expandAll) await expandAll();
+                }
+              }
+              await expandTail(true);
+            } finally {
+              fileExpansionRunning = false;
+              fileToggle.disabled = false;
+              refreshFileToggle();
+            }
+          };
+          const collapseFile = async () => {
+            if (fileExpansionRunning || !originalBody || !table.tBodies[0]) return;
+            fileExpansionRunning = true;
+            fileToggle.disabled = true;
+            table.tBodies[0].replaceWith(originalBody.cloneNode(true));
+            fileToggle.remove();
+            wrapper.dataset.localMrContextPrepared = "false";
+            prepareContextExpansion(entry, wrapper);
+            await highlightSyntax(wrapper);
+          };
+          fileToggle.addEventListener("click", () => {
+            if (fileToggle.dataset.state === "expanded") collapseFile();
+            else expandFile();
+          });
+
           const clearGapControls = (gap) => {
             gap.gutter.replaceChildren();
             gap.hunkContainer
@@ -3536,7 +3625,8 @@
           };
           const finishGap = (gap) => {
             clearGapControls(gap);
-            gap.row.classList.remove("local-mr-context-decoration");
+            gap.row.remove();
+            refreshFileToggle();
           };
           const renderGapControls = (gap) => {
             clearGapControls(gap);
@@ -3595,8 +3685,10 @@
               } finally {
                 gap.loading = false;
                 if (gap.row.isConnected) renderGapControls(gap);
+                refreshFileToggle();
               }
             };
+            gap.expand = expand;
             if (remaining <= 20) {
               controls.append(makeContextButton("all", expand("all")));
             } else {
@@ -3630,7 +3722,7 @@
             const content = cells.at(-1);
             const hunkContainer = hunk.hunkContainer;
             if (!gutter || !content || !hunkContainer) return;
-            renderGapControls({
+            const gap = {
               row: hunk.row,
               gutter,
               hunkContainer,
@@ -3641,7 +3733,9 @@
               offset: hunk.newStart - hunk.oldStart,
               loading: false,
               error: "",
-            });
+            };
+            gaps.push(gap);
+            renderGapControls(gap);
           });
 
           const lastHunk = hunks.at(-1);
@@ -3665,44 +3759,56 @@
           let tailPrefetch = fetchContextLines(entry, nextLine, nextLine + 19)
             .then((payload) => {
               prefetchedTail = payload;
+              tailPending = false;
               if (payload.lines.length > 0 && !footer.isConnected) {
                 table.tBodies[0].append(footer);
               }
+              refreshFileToggle();
               return payload;
             })
             .catch((error) => {
+              tailPending = false;
               if (error.name !== "AbortError" && !footer.isConnected) {
                 table.tBodies[0].append(footer);
               }
+              refreshFileToggle();
               return null;
             });
-          const expandTail = async () => {
+          expandTail = async (all = false) => {
             if (loading) return;
             loading = true;
             const button = controls.querySelector("button");
             if (button) button.disabled = true;
             try {
-              if (tailPrefetch) await tailPrefetch;
-              const payload = prefetchedTail
-                || await fetchContextLines(entry, nextLine, nextLine + 19);
-              prefetchedTail = null;
-              tailPrefetch = null;
-              const rows = payload.lines.map((lineText, index) => {
-                const oldLine = payload.start + index;
-                return makeExpandedContextRow({
-                  table,
-                  oldLine,
-                  newLine: oldLine + offset,
-                  lineText,
+              let keepExpanding = true;
+              while (keepExpanding) {
+                if (tailPrefetch) await tailPrefetch;
+                const payload = prefetchedTail
+                  || await fetchContextLines(
+                    entry,
+                    nextLine,
+                    all ? Number.MAX_SAFE_INTEGER : nextLine + 19,
+                  );
+                prefetchedTail = null;
+                tailPrefetch = null;
+                const rows = payload.lines.map((lineText, index) => {
+                  const oldLine = payload.start + index;
+                  return makeExpandedContextRow({
+                    table,
+                    oldLine,
+                    newLine: oldLine + offset,
+                    lineText,
+                  });
                 });
-              });
-              await highlightSyntax(wrapper, rows);
-              footer.before(...rows);
-              nextLine = payload.end + 1;
-              lastHunk.oldLines += rows.length;
-              lastHunk.newLines += rows.length;
-              updateHunkLabel(lastHunk);
-              if (rows.length === 0 || !payload.hasMore) footer.remove();
+                await highlightSyntax(wrapper, rows);
+                footer.before(...rows);
+                nextLine = payload.end + 1;
+                lastHunk.oldLines += rows.length;
+                lastHunk.newLines += rows.length;
+                updateHunkLabel(lastHunk);
+                keepExpanding = all && rows.length > 0 && payload.hasMore;
+                if (rows.length === 0 || !payload.hasMore) footer.remove();
+              }
             } catch (error) {
               if (error.name !== "AbortError") {
                 console.error(error);
@@ -3711,11 +3817,13 @@
             } finally {
               loading = false;
               if (button?.isConnected) button.disabled = false;
+              refreshFileToggle();
             }
           };
-          controls.append(makeContextButton("down", expandTail));
+          controls.append(makeContextButton("down", () => expandTail(false)));
           gutter.append(controls);
           footer.append(gutter, content);
+          refreshFileToggle();
         };
         const wrappersById = new Map(fileWrappers.map((wrapper) => [wrapper.id, wrapper]));
         fileWrappers.forEach((wrapper) => {
