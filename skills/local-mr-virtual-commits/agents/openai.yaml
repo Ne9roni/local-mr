@@ -1,4 +1,4 @@
 interface:
   display_name: "Local MR Virtual Commits"
-  short_description: "Turn large local diffs into guided review commits"
-  default_prompt: "Use $local-mr-virtual-commits to organize this local diff into a human-friendly virtual commit review."
+  short_description: "Plan and confirm guided virtual-commit reviews"
+  default_prompt: "Use $local-mr-virtual-commits to plan this local diff as virtual commits and ask for my confirmation before creating the review."

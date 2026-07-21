@@ -40,7 +40,19 @@ try {
         "npm package includes the Skill protocol": packedFiles.has(`${bundledSkill}/references/protocol.md`),
         "official Skill offers both review depths": bundledSkillText.includes("**Overview:**")
             && bundledSkillText.includes("**Deep review:**")
-            && bundledSkillText.includes("Treat them as independent choices"),
+            && bundledSkillText.includes("Treat depth and order as independent choices"),
+        "official Skill asks for depth before snapshot and analysis": bundledSkillText.includes(
+            "ask before running `snapshot` or analyzing the comparison",
+        ) && bundledSkillText.includes(
+            "Wait for the user's choice",
+        ),
+        "official Skill gates creation on explicit plan approval": bundledSkillText.includes(
+            "complete ordered, numbered list of virtual-commit titles",
+        ) && bundledSkillText.includes(
+            "explicitly approves the latest displayed title list",
+        ) && bundledSkillText.includes(
+            "Only after approval, submit the approved manifest with `create`",
+        ),
     };
     if (Object.values(packageChecks).some((passed) => !passed)) {
         throw new Error(`Package regression failed: ${JSON.stringify(packageChecks)}`);

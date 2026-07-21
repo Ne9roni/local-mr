@@ -46,7 +46,8 @@ local-mr virtual-commit install-skill codex
 Use local-mr virtual commits to organize the committed changes against
 origin/main. Use Deep review: put documentation and contracts first, then
 dependencies, high-risk behavior, integrations, and tests. Keep generated
-files last and open the review when it is ready.
+files last. Show me the ordered Virtual Commit titles before generating the
+review page.
 ```
 
 The browser opens the generated route in the normal Diff workspace with **Real / Virtual** switching, Single commit and Commit range modes, previous/next navigation, risk and review-focus guidance, immutable revisions, and reviewed progress. See [Virtual Commit reference](#virtual-commit-reference) for the complete workflow and [the dedicated guide](docs/virtual-commits.md) for the manifest and JSON CLI.
@@ -170,12 +171,13 @@ Use `--force` only when intentionally updating an existing installed copy. Then 
 ```text
 Use local-mr virtual commits to organize the committed changes against
 origin/main. Use Deep review with a dependency-aware, core/risk-first reading
-order and open the review when it is ready.
+order. Show me the ordered Virtual Commit titles before generating the review
+page.
 ```
 
-Review depth and reading order are independent. **Overview** usually creates 5–8 broad, mostly whole-file chapters; **Deep review** usually creates 10–20 narrower steps and may place blocks from one large file in different Virtual Commits. If depth is omitted, the Skill snapshots the comparison, asks once with its actual size, and recommends Deep review for large or AI-produced changes. If no reading order is supplied, it uses dependency-aware core/risk-first. It inspects only the frozen files and blocks needed for each grouping decision, submits the manifest, fixes any structured validation errors against the same source, and opens the tokenized loopback review in the browser without relaying its URL.
+Review depth and reading order are independent. **Overview** usually creates 5–8 broad, mostly whole-file chapters; **Deep review** usually creates 10–20 narrower steps and may place blocks from one large file in different Virtual Commits. If depth is omitted, the Skill asks before taking a snapshot or analyzing the comparison and recommends Deep review for large or AI-produced changes. If no reading order is supplied, it uses dependency-aware core/risk-first. After analyzing the frozen source, it displays the complete ordered Virtual Commit title list and waits for explicit approval. Only then does it submit the manifest and open the tokenized loopback review in the browser without relaying its URL.
 
-The human chooses the review depth; the model proposes the reading plan. local-mr independently enforces source immutability, block conservation, final-tree equality, persistence, and Git safety.
+The human chooses the review depth and approves the proposed reading plan; the model analyzes and prepares it. local-mr independently enforces source immutability, block conservation, final-tree equality, persistence, and Git safety.
 
 ### Review Real and Virtual side by side
 

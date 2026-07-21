@@ -71,14 +71,14 @@ local-mr virtual-commit install-skill codex --force
 
 安装必须显式执行，因为 Skill 负责告诉 Agent 如何分组以及应遵守哪些安全规则；local-mr 确定性的快照、校验、存储和渲染引擎本身并不依赖 Skill。
 
-### 3. 让 Codex 选择评审深度并制定阅读计划
+### 3. 选择评审深度并确认阅读计划
 
 在目标仓库里启动 Codex，并明确目标分支、偏好的评审深度和阅读顺序。例如：
 
 ```text
 使用 local-mr virtual commits，把当前分支相对 origin/main 的已提交修改
 整理成适合评审的顺序。使用 Deep review，并采用依赖优先、核心与风险
-优先的阅读顺序，完成后打开页面。
+优先的阅读顺序。生成审查页面前，先展示有序的 Virtual Commit 标题列表。
 ```
 
 也可以给出更具体的要求：
@@ -100,18 +100,19 @@ local-mr virtual-commit install-skill codex --force
 | **Overview** | 5–8 | 优先采用较宽的语义章节，以及整文件或子系统分组。 |
 | **Deep review** | 10–20 | 每一步只回答一个评审问题，必要时拆开同一文件的多个 block。 |
 
-步骤数只是经验值。不可拆分的 block 必须保持完整；一个明确的最终生成物/机械改动步骤可以更大。阅读顺序是另一项独立选择。没有指定深度时，内置 Skill 会先冻结 source，再根据真实规模询问一次；大型或 AI 生成的比较默认推荐 Deep review。没有指定阅读顺序时，默认采用“依赖优先、核心/风险优先”。
+步骤数只是经验值。不可拆分的 block 必须保持完整；一个明确的最终生成物/机械改动步骤可以更大。阅读顺序是另一项独立选择。没有指定深度时，内置 Skill 会在冻结或分析 source 前询问；大型或 AI 生成的比较默认推荐 Deep review。没有指定阅读顺序时，默认采用“依赖优先、核心/风险优先”。
 
-随后 Agent 会：
+随后 Agent 会按带确认闸门的流程执行：
 
-1. 用 `snapshot` 冻结已提交比较；
-2. 解析请求中的评审深度；只有无法推断时，才在 snapshot 后询问一次；
+1. 解析请求中的评审深度；没有指定时，在 snapshot 和分析之前询问；
+2. 用 `snapshot` 冻结已提交比较；
 3. 检查目录，并通过 `show` 只读取理解分组所需的文件或变更块；
 4. 把每个 block 分配到有序 Virtual Commit，并编写带锚点的意图、重点、不确定项和风险说明；
-5. 把 manifest 交给 `create`，根据结构化校验错误修正计划，但不更换 source；
-6. 在浏览器打开带随机令牌的本机回环审查，不把 URL 带回 Agent 对话。
+5. 展示完整、有序的 Virtual Commit 标题列表，并等待用户明确确认这版计划；
+6. 仅在确认后把 manifest 交给 `create`，根据结构化校验错误修正计划，但不更换 source；
+7. 在浏览器打开带随机令牌的本机回环审查，不把 URL 带回 Agent 对话。
 
-人类选择评审深度，模型提出阅读策略；local-mr 独立保证 source 不变、block 守恒、最终 tree 相等、revision 持久化和 Git 安全。
+最初的生成请求和粒度选择都不算对未展示计划的确认；如果标题列表发生变化，Agent 必须重新展示完整列表并再次等待确认。人类选择评审深度并确认阅读策略；local-mr 独立保证 source 不变、block 守恒、最终 tree 相等、revision 持久化和 Git 安全。
 
 ## 使用审查页面
 

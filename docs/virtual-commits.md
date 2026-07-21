@@ -71,14 +71,15 @@ local-mr virtual-commit install-skill codex --force
 
 The install is explicit because the Skill gives the agent the grouping workflow and safety rules; it is not required by local-mr's deterministic snapshot, validation, storage, or rendering engine.
 
-### 3. Ask Codex for a review depth and reading plan
+### 3. Choose a review depth and approve the reading plan
 
 Start Codex in the repository and make the target, preferred review depth, and reading order clear. For example:
 
 ```text
 Use local-mr virtual commits to organize the committed changes against
 origin/main. Use Deep review with a dependency-aware, core/risk-first reading
-order and open the review when it is ready.
+order. Show me the ordered Virtual Commit titles before generating the review
+page.
 ```
 
 Other useful directions include:
@@ -100,18 +101,19 @@ Review depth controls grouping resolution, not completeness:
 | **Overview** | 5–8 steps | Prefer broad semantic chapters and whole-file or subsystem groups. |
 | **Deep review** | 10–20 steps | Make each step answer one reviewer question and split a multi-block file when useful. |
 
-These counts are heuristics. Indivisible blocks stay whole, and one explicit final generated/mechanical step may be larger. Reading order remains a separate choice. If depth is absent, the bundled Skill first freezes the source, then asks once using its actual size and recommends Deep review for large or AI-produced comparisons. If reading order is absent, it uses dependency-aware core/risk-first.
+These counts are heuristics. Indivisible blocks stay whole, and one explicit final generated/mechanical step may be larger. Reading order remains a separate choice. If depth is absent, the bundled Skill asks before freezing or analyzing the source and recommends Deep review for large or AI-produced comparisons. If reading order is absent, it uses dependency-aware core/risk-first.
 
-The agent then:
+The agent then follows a confirmation-gated workflow:
 
-1. freezes the committed comparison with `snapshot`;
-2. resolves the requested depth, asking once after the snapshot only when it was not supplied or implied;
+1. resolves the requested depth, asking before any snapshot or analysis when it was not supplied;
+2. freezes the committed comparison with `snapshot`;
 3. inspects the returned catalog and reads only relevant files or blocks with `show`;
 4. assigns every block to an ordered virtual commit and writes anchored intent, focus, uncertainty, and risk guidance;
-5. submits the manifest to `create`, correcting any structured validation errors without changing the source; and
-6. opens the tokenized loopback review in the browser without relaying its URL through the agent conversation.
+5. displays the complete ordered Virtual Commit title list and waits for explicit approval of that exact plan;
+6. only after approval, submits the manifest to `create`, correcting structured validation errors without changing the source; and
+7. opens the tokenized loopback review in the browser without relaying its URL through the agent conversation.
 
-The human chooses the review depth; the model proposes the reading strategy. local-mr independently enforces source immutability, block conservation, final-tree equality, revision persistence, and Git safety.
+The initial request to create a review and the depth selection do not count as approval of an unseen plan. If the title list changes, the agent shows the full updated list and waits for approval again. The human chooses the review depth and approves the reading strategy; local-mr independently enforces source immutability, block conservation, final-tree equality, revision persistence, and Git safety.
 
 ## Using the review page
 
