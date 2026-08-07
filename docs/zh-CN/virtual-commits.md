@@ -41,7 +41,7 @@ Virtual Commit 优化的是评审顺序，而不是构建顺序。中间虚拟�
 3. **变更块严格守恒。** 每个 source block 必须且只能出现在一个 Virtual Commit 中。未知、遗漏或重复的 block ID 会让整个 manifest 校验失败。
 4. **最终状态精确相等。** `create` 会在隔离的临时 Git 仓库里物化累积状态，并验证最后一个 Virtual Commit 之后的状态等于冻结的目标 tree。
 5. **完整审查等价。** Real 与 Virtual 使用相同的规范化 binary/full-index diff 参数。因此完整 Virtual range 与冻结的完整 Real range 拥有相同 patch 和渲染后 Diff。
-6. **只读投影。** 整个流程不会把 Virtual Commit 应用到工作区，也不会修改真实 index、对象库、refs、commit、Git 配置或远端。
+6. **只读投影。** 评审流程不会把 Virtual Commit 应用到工作区，也不会修改真实 index、对象库、refs、commit、Git 配置或远端。唯一例外是下文介绍的显式 `materialize` 命令：在全部校验通过后，它会写入对象并且只移动两个分支 ref——先创建的备份分支和被替换的评审分支。它仍然不会触碰工作区、真实 index、Git 配置或远端。
 
 只有完整范围理应相同。任意局部 Real range 和 Virtual range 通常代表不同分组：Real 遵循 Git first-parent 历史，Virtual 遵循 Agent 编排的阅读顺序。
 
@@ -290,6 +290,33 @@ Schema version 1 的 manifest 结构如下。这个例子假设 source 恰好包
 
 校验错误会返回稳定的错误码和字段路径。例如 `MISSING_BLOCK`、`DUPLICATE_BLOCK`、`UNKNOWN_BLOCK`、`UNKNOWN_TARGET` 会指出需要修正的具体分配或锚点。请使用同一个 `SOURCE_ID` 重试；重新创建 snapshot 会改变当前评审的清单。
 
+## 把阅读计划物化为真实 commit
+
+Virtual Commit 通常只存在于本地。当希望其他评审人不安装 local-mr、直接在 Git 托管平台上看到这份阅读顺序时，可以把某个 revision 转换成真实 commit：
+
+```bash
+local-mr virtual-commit materialize REVIEW_ID
+local-mr virtual-commit materialize REVIEW_ID --revision 2 --backup backup/login-flow/before-materialize
+```
+
+`materialize` 会重写被评审分支：从冻结的 merge base 开始，按 manifest 顺序为每个 Virtual Commit 生成一个真实 commit。提交信息携带完整评审语境：subject 是 Virtual Commit 标题，正文包含意图、评审重点、风险评估，以及 `Local-MR-Virtual-Commit: REVIEW_ID@rN i/n` trailer。
+
+所有检查通过之前命令拒绝执行，且在此之前不改动任何 ref：
+
+1. **只接受新鲜 source。** 分支必须仍指向冻结的 head commit，与冻结 target ref 的 merge base 必须未变，重新计算的比较必须与冻结的 `diffHash` 一致。过期 revision 会以 `STALE_SOURCE` 失败；请重新 snapshot 并创建新 revision。
+2. **精确重建 tree。** 每个累积虚拟状态都会在仓库中重建为完整 tree，最后一个 tree 必须等于冻结 head commit 的 tree。不相等时不做任何改动。
+3. **先备份再替换。** 冻结的分支头会先保存到备份分支——默认 `backup/<分支名>/<短SHA>`，也可用 `--backup NAME` 指定。已存在且指向其他 commit 的备份分支会以 `BACKUP_EXISTS` 失败，而不是被覆盖。
+4. **原子比较交换。** 只有分支仍指向冻结 head 时才会替换分支 ref，并发提交不会被悄悄丢弃。
+
+工作区、index 和未提交改动完全不受影响；由于最终 tree 相同，已检出的分支在替换后依然保持干净。命令不会执行 push。若要恢复原始历史，运行 `git reset --hard <备份分支>`（或用 `git branch -f` 把分支指回去）。
+
+物化是在用 Git 历史换取阅读顺序：
+
+- 原始 commit、逐 commit 的作者粒度和签名只保留在备份分支上。新 commit 使用当前 Git 身份，且未签名。
+- 中间虚拟状态可能无法构建；按 commit 运行的 CI 和 `git bisect` 反映的是阅读顺序而非构建顺序。
+- 分支若已发布过，之后推送需要 `git push --force-with-lease`。
+- 已保存的 review 仍然可用：分支移动会让它变成 **Virtual · stale**，这是预期行为——其冻结内容此刻正等于被推送的真实 commit。
+
 ## 存储、隐私与清理
 
 Snapshot 和 review 保存在仓库外：
@@ -316,4 +343,6 @@ Review 服务只监听 `127.0.0.1`，并为所有业务路径加入随机令牌�
 | `INVALID_VIRTUAL_SOURCE_BOUNDARY` | Source 没有从 merge base 开始，或结束在工作区。请选择完整的 merge-base 到真实 commit 范围。 |
 | `INVALID_MANIFEST` | Schema、锚点或 block 守恒规则失败。修正 `error.details` 中的每一项，并用同一个 source 重试。 |
 | `REVISION_CONFLICT` | Review 已被追加了其他 revision。读取当前 revision，重新生成预期修订，再用新的 `--expected-revision` 重试。 |
+| `STALE_SOURCE` | 分支、merge base 或比较内容在冻结之后发生了变化，`materialize` 拒绝替换分支。请重新 snapshot 并创建新 revision。 |
+| `BACKUP_EXISTS` | 备份分支已存在且指向其他 commit。请换一个 `--backup NAME` 或先移走旧备份；不会覆盖任何内容。 |
 | `SKILL_EXISTS` | Codex Skill 已安装。只有明确要更新它时才使用 `install-skill codex --force`。 |

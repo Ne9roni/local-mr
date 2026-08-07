@@ -19,6 +19,7 @@ import {
 } from "./virtual-diff.mjs";
 import { validateVirtualReviewManifest } from "./virtual-review-manifest.mjs";
 import {
+    loadVirtualReviewRevision,
     loadVirtualSource,
     readVirtualBlob,
     saveVirtualReviewRevision,
@@ -594,6 +595,220 @@ export const createVirtualReview = async ({
         fullPatch,
     }, stateRoot);
 });
+
+const materializeError = (code, message, details) => {
+    const error = new Error(message);
+    error.code = code;
+    if (details) error.details = details;
+    return error;
+};
+
+const virtualCommitMessage = ({ virtualCommit, reviewId, revision, position, total }) => {
+    const lines = [
+        virtualCommit.title,
+        "",
+        `Intent: ${virtualCommit.intent}`,
+        "",
+        "Review focus:",
+        ...virtualCommit.reviewFocus.map((focus) => `- ${focus.text}`),
+        "",
+        `Risk (${virtualCommit.risk.level}): ${virtualCommit.risk.reason}`,
+        "",
+        `Local-MR-Virtual-Commit: ${reviewId}@r${revision} ${position}/${total}`,
+    ];
+    return `${lines.join("\n")}\n`;
+};
+
+const resolveOptionalCommit = async (repoRoot, reference) => (await git(
+    repoRoot,
+    ["rev-parse", "--verify", "--quiet", `${reference}^{commit}`],
+    { allowExitCodeOne: true },
+)).trim();
+
+const assertFreshMaterializeSource = async ({ source, repoRoot, branchName }) => {
+    const frozenHead = source.repository.headSha;
+    let currentHead;
+    try {
+        currentHead = await resolveOptionalCommit(repoRoot, `refs/heads/${branchName}`);
+    } catch (error) {
+        throw materializeError(
+            "REPOSITORY_UNAVAILABLE",
+            `Cannot read the source repository at ${repoRoot}: ${error.message}`,
+        );
+    }
+    if (!currentHead) {
+        throw materializeError("BRANCH_NOT_FOUND", `The frozen source branch does not exist: ${branchName}`);
+    }
+    if (currentHead !== frozenHead) {
+        throw materializeError(
+            "STALE_SOURCE",
+            "The branch moved after the source was frozen; create a new snapshot and revision before materializing",
+            { branch: branchName, frozenHead, currentHead },
+        );
+    }
+    const currentTarget = await resolveOptionalCommit(repoRoot, source.repository.targetRef);
+    if (!currentTarget) {
+        throw materializeError(
+            "STALE_SOURCE",
+            `The frozen target ref no longer exists: ${source.repository.targetRef}`,
+        );
+    }
+    const currentBase = (await git(
+        repoRoot,
+        ["merge-base", currentHead, currentTarget],
+        { allowExitCodeOne: true },
+    )).trim();
+    if (currentBase !== source.repository.baseSha) {
+        throw materializeError(
+            "STALE_SOURCE",
+            "The merge base changed after the source was frozen; create a new snapshot and revision before materializing",
+            { frozenBase: source.repository.baseSha, currentBase },
+        );
+    }
+    const patchText = await git(repoRoot, [
+        "diff", "--binary", "--full-index", "--find-renames", "--no-ext-diff", "--no-textconv",
+        source.repository.baseSha, frozenHead, "--",
+    ]);
+    const currentDiffHash = crypto.createHash("sha256").update(patchText).digest("hex");
+    if (currentDiffHash !== source.diffHash) {
+        throw materializeError(
+            "STALE_SOURCE",
+            "The frozen comparison no longer matches the repository content",
+            { frozenDiffHash: source.diffHash, currentDiffHash },
+        );
+    }
+};
+
+const resolveBackupBranch = async ({ source, repoRoot, branchName, backupName }) => {
+    const backupBranch = backupName ?? `backup/${branchName}/${source.branchCommit.shortSha}`;
+    if (backupBranch === branchName) {
+        throw materializeError("INVALID_BACKUP_NAME", "The backup branch cannot be the reviewed branch itself");
+    }
+    try {
+        await git(repoRoot, ["check-ref-format", "--branch", backupBranch]);
+    } catch {
+        throw materializeError("INVALID_BACKUP_NAME", `Invalid backup branch name: ${backupBranch}`);
+    }
+    const existingBackup = await resolveOptionalCommit(repoRoot, `refs/heads/${backupBranch}`);
+    if (existingBackup && existingBackup !== source.repository.headSha) {
+        throw materializeError(
+            "BACKUP_EXISTS",
+            `The backup branch already exists and points to a different commit: ${backupBranch}`,
+            { backupBranch, existingBackup, frozenHead: source.repository.headSha },
+        );
+    }
+    return { backupBranch, existingBackup };
+};
+
+const materializeStateTrees = async ({ source, manifest, repoRoot, stateRoot, zeroOid }) => {
+    const affectedPaths = new Set();
+    for (const file of source.files) {
+        if (file.base?.path) affectedPaths.add(file.base.path);
+        if (file.target?.path) affectedPaths.add(file.target.path);
+    }
+    const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "local-mr-virtual-materialize-"));
+    const oidByContentHash = new Map();
+    const blobOid = async (content) => {
+        const key = crypto.createHash("sha256").update(content).digest("hex");
+        if (!oidByContentHash.has(key)) {
+            oidByContentHash.set(
+                key,
+                (await git(repoRoot, ["hash-object", "-w", "--stdin"], { input: content })).trim(),
+            );
+        }
+        return oidByContentHash.get(key);
+    };
+    try {
+        const trees = [];
+        for (let state = 1; state <= manifest.virtualCommits.length; state += 1) {
+            const entries = await buildState({
+                source,
+                selectedBlocks: blocksThroughVirtualCommit(manifest, state),
+                stateRoot,
+            });
+            const env = { GIT_INDEX_FILE: path.join(temporaryDirectory, `index-${state}`) };
+            await git(repoRoot, ["read-tree", source.repository.baseSha], { env });
+            const indexInfo = [...affectedPaths].map((affectedPath) => `0 ${zeroOid}\t${affectedPath}`);
+            for (const entry of entries.values()) {
+                const oid = entry.mode === "160000" ? entry.oid : await blobOid(entry.content);
+                indexInfo.push(`${entry.mode} ${oid}\t${entry.path}`);
+            }
+            await git(repoRoot, ["update-index", "--index-info"], { env, input: `${indexInfo.join("\n")}\n` });
+            trees.push((await git(repoRoot, ["write-tree"], { env })).trim());
+        }
+        return trees;
+    } finally {
+        await fs.rm(temporaryDirectory, { recursive: true, force: true });
+    }
+};
+
+export const materializeVirtualReview = async ({
+    reviewId,
+    revision,
+    backupName,
+    stateRoot = virtualReviewStateRoot(),
+}) => {
+    const { record } = await loadVirtualReviewRevision({ reviewId, revision }, stateRoot);
+    const source = await loadVirtualSource(record.sourceId, stateRoot);
+    const { manifest } = record;
+    const repoRoot = source.repository.root;
+    const branchName = source.repository.branchName;
+    const frozenHead = source.repository.headSha;
+    const zeroOid = "0".repeat(source.repository.objectFormat === "sha256" ? 64 : 40);
+
+    await assertFreshMaterializeSource({ source, repoRoot, branchName });
+    const { backupBranch, existingBackup } = await resolveBackupBranch({
+        source,
+        repoRoot,
+        branchName,
+        backupName,
+    });
+
+    const trees = await materializeStateTrees({ source, manifest, repoRoot, stateRoot, zeroOid });
+    const frozenHeadTree = (await git(repoRoot, ["rev-parse", `${frozenHead}^{tree}`])).trim();
+    if (trees.at(-1) !== frozenHeadTree) {
+        throw materializeError(
+            "MATERIALIZE_TREE_MISMATCH",
+            "The materialized virtual commits do not reproduce the frozen branch tree; no reference was changed",
+        );
+    }
+
+    const commits = [];
+    let parent = source.repository.baseSha;
+    for (let index = 0; index < manifest.virtualCommits.length; index += 1) {
+        const virtualCommit = manifest.virtualCommits[index];
+        const message = virtualCommitMessage({
+            virtualCommit,
+            reviewId: record.reviewId,
+            revision: record.revision,
+            position: index + 1,
+            total: manifest.virtualCommits.length,
+        });
+        parent = (await git(repoRoot, ["commit-tree", trees[index], "-p", parent], { input: message })).trim();
+        commits.push({ sha: parent, title: virtualCommit.title });
+    }
+
+    if (!existingBackup) {
+        await git(repoRoot, ["update-ref", `refs/heads/${backupBranch}`, frozenHead, zeroOid]);
+    }
+    await git(repoRoot, [
+        "update-ref",
+        "-m", `local-mr virtual-commit materialize: ${record.reviewId}@r${record.revision}`,
+        `refs/heads/${branchName}`, parent, frozenHead,
+    ]);
+    return {
+        reviewId: record.reviewId,
+        revision: record.revision,
+        sourceId: record.sourceId,
+        repositoryRoot: repoRoot,
+        branch: branchName,
+        previousHead: frozenHead,
+        newHead: parent,
+        backupBranch,
+        backupCreated: !existingBackup,
+        commits,
+    };
+};
 
 export const inspectVirtualSourceFreshness = async (source) => {
     try {

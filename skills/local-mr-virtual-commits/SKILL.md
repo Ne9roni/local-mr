@@ -1,6 +1,6 @@
 ---
 name: local-mr-virtual-commits
-description: Organize a large local-mr comparison into a persistent, human-guided sequence of virtual commits at Overview or Deep review granularity without changing Git. Use a confirmation-gated workflow that asks for granularity, proposes the ordered virtual-commit titles, and waits for explicit approval before creating or opening the page. Use when a user wants an AI-produced or otherwise large local diff reordered for human review, requests a coarse overview or fine-grained sign-off route, wants to create or revise a virtual-commit review, or wants to reopen a saved virtual review.
+description: Organize a large local-mr comparison into a persistent, human-guided sequence of virtual commits at Overview or Deep review granularity without changing Git. Use a confirmation-gated workflow that asks for granularity, proposes the ordered virtual-commit titles, and waits for explicit approval before creating or opening the page. Use when a user wants an AI-produced or otherwise large local diff reordered for human review, requests a coarse overview or fine-grained sign-off route, wants to create or revise a virtual-commit review, wants to reopen a saved virtual review, or explicitly asks to materialize a saved virtual review into real Git commits so other reviewers can see the reading order after a push.
 ---
 
 # Local MR Virtual Commits
@@ -12,7 +12,7 @@ Read [references/protocol.md](references/protocol.md) completely before invoking
 ## Preserve the trust boundary
 
 - Use the snapshot catalog as the sole inventory of changed blocks. Do not substitute a separately generated diff.
-- Never run a Git command that changes the worktree, index, refs, commits, configuration, or remotes. Never apply a virtual commit back to Git.
+- Never run a Git command that changes the worktree, index, refs, commits, configuration, or remotes. Never apply a virtual commit back to Git yourself. The only permitted way to change Git history is the dedicated `materialize` CLI command, under the rules in "Materialize only on explicit request" below.
 - Reference only stable block IDs emitted for the frozen snapshot. Assign every block exactly once; invent, omit, duplicate, or rewrite nothing.
 - Keep special file-level blocks such as binary, rename, submodule, and mode changes whole. Include them even when they are low-value review material.
 
@@ -34,3 +34,13 @@ Read [references/protocol.md](references/protocol.md) completely before invoking
 11. Do not extract, print, or return `reviewUrl`. Use `open` with the same private-output handling only to reopen an existing saved review. Finish with a concise description of the approved route and state that the review was opened in the browser.
 
 When changing an existing review, create a new revision under its review ID. Reset the reading plan rather than assuming prior progress. Create a separate review ID when the user wants an alternative strategy instead of a revision.
+
+## Materialize only on explicit request
+
+`materialize` replaces the reviewed branch with one real commit per virtual commit so the reading order survives a push. It rewrites branch history, so treat it as destructive and confirmation-gated:
+
+1. Run it only when the user explicitly asks to convert a saved virtual review into real commits (or to make the reading order visible to other reviewers after a push). Creating or approving a review plan is never such a request.
+2. Before running it, state what will happen and wait for explicit confirmation: name the review, the branch that will be replaced, the backup branch that will preserve the current head, and that recovery is `git reset --hard <backup-branch>`.
+3. Use only `local-mr virtual-commit materialize`; never reproduce the rewrite with raw Git commands. The engine refuses stale sources, verifies that the final tree equals the frozen branch head tree, creates the backup branch first, and replaces the branch atomically.
+4. Never push afterwards unless the user separately asks. When reporting the result, mention the backup branch and that pushing a previously published branch requires `git push --force-with-lease`.
+5. On `STALE_SOURCE`, tell the user the branch or merge base moved and offer to build a fresh snapshot, plan, and revision through the normal approval workflow first. On `BACKUP_EXISTS`, ask for a different `--backup NAME` instead of deleting or overwriting anything.

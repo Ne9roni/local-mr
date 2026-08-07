@@ -11,6 +11,7 @@ import {
     captureVirtualReviewSource,
     createVirtualReview,
     inspectVirtualSourceItem,
+    materializeVirtualReview,
     virtualSourceCatalog,
 } from "./virtual-review-core.mjs";
 import { ManifestValidationError } from "./virtual-review-manifest.mjs";
@@ -45,6 +46,9 @@ Commands:
       Validate a manifest, save an immutable revision, and open its review page.
   open REVIEW_ID [--revision N] [--no-open]
       Open a saved virtual-commit review.
+  materialize REVIEW_ID [--revision N] [--backup NAME]
+      Back up the frozen branch head, then replace the branch with one real
+      commit per virtual commit so the reading order survives a push.
   list
       List saved reviews.
   delete REVIEW_ID [--revision N]
@@ -409,6 +413,25 @@ const main = async () => {
             noOpen: Boolean(options["no-open"]),
         });
         jsonOutput({ ok: true, reviewId, revision: ready.revision, reviewUrl: ready.reviewUrl });
+        return;
+    }
+    if (command === "materialize") {
+        const { options, positional } = parseOptions(values, {
+            positionals: 1,
+            allowed: ["revision", "backup"],
+        });
+        const reviewId = positional[0];
+        if (!reviewId) throw new Error("materialize requires REVIEW_ID");
+        const result = await materializeVirtualReview({
+            reviewId,
+            revision: integerOption(options.revision, "revision", 1),
+            backupName: options.backup,
+        });
+        jsonOutput({
+            ok: true,
+            ...result,
+            note: "The branch history was rewritten; pushing a previously published branch requires git push --force-with-lease.",
+        });
         return;
     }
     if (command === "list") {

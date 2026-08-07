@@ -10,6 +10,7 @@ local-mr virtual-commit show SOURCE_ID [--file PATH | --block ID | --full]
 local-mr virtual-commit create SOURCE_ID [--manifest FILE] [--review ID] [--expected-revision N] [--no-open]
 local-mr virtual-commit open REVIEW_ID [--revision NUMBER] [--no-open]
 local-mr virtual-commit list
+local-mr virtual-commit materialize REVIEW_ID [--revision NUMBER] [--backup NAME]
 ```
 
 - `snapshot` freezes the selected comparison. Omit all options to use local-mr's detected target and default comparison. Supply `--target` to select another target. Supply `--mode`, `--from`, and `--to` together to select an existing comparison range. Its `source.branchCommit` identifies the exact real branch commit at the frozen `to` endpoint; `source.files` is the metadata catalog to inspect first.
@@ -17,6 +18,7 @@ local-mr virtual-commit list
 - `create` reads the manifest from stdin when `--manifest` is omitted or is `-`; otherwise it reads the named file. From this Skill, call it only after the user has explicitly approved the latest displayed ordered title list. Omit `--no-open` so local-mr opens the browser, redirect stdout to a mode-`0600` temporary file, and remove that file immediately after checking the exit status. Omit `--review` to create a review. Supply an existing review ID to append an immutable revision, and pass its latest revision as `--expected-revision` to reject concurrent updates.
 - `open` starts or reuses the loopback review server for an existing saved review. From this Skill, let it open the browser and protect stdout in the same way as `create`. Omit `--revision` for the newest revision.
 - `list` returns saved reviews and revisions. Every revision includes `branchCommit` metadata resolved from its own source, so do not assume that revision order and branch commit order are the same. Use it only to resolve an existing review requested by the user.
+- `materialize` replaces the reviewed branch with one real commit per virtual commit after saving the frozen head to a backup branch (default `backup/<branch>/<short-sha>`, override with `--backup NAME`). It refuses stale sources, verifies the final tree equals the frozen head tree before changing any ref, never touches the worktree or index, and never pushes. Run it only under the explicit-request and confirmation rules in SKILL.md. Its output contains no `reviewUrl` and may be summarized to the user.
 
 Success responses include root-level `schemaVersion: 1` and `ok: true`. The command response shapes are:
 
@@ -26,9 +28,10 @@ Success responses include root-level `schemaVersion: 1` and `ok: true`. The comm
 {"schemaVersion":1,"ok":true,"reviewId":"opaque","revision":1,"sourceId":"opaque","reviewUrl":"http://127.0.0.1:PORT/TOKEN/..."}
 {"schemaVersion":1,"ok":true,"reviewId":"opaque","revision":1,"reviewUrl":"http://127.0.0.1:PORT/TOKEN/..."}
 {"schemaVersion":1,"ok":true,"reviews":[{"reviewId":"opaque","revisions":[{"revision":1,"sourceId":"opaque","branchCommit":{"sha":"full-sha","shortSha":"short-sha","subject":"subject","branchName":"branch"}}]}]}
+{"schemaVersion":1,"ok":true,"reviewId":"opaque","revision":1,"sourceId":"opaque","repositoryRoot":"/absolute/repo/path","branch":"branch","previousHead":"full-sha","newHead":"full-sha","backupBranch":"backup/branch/short-sha","backupCreated":true,"commits":[{"sha":"full-sha","title":"virtual commit title"}],"note":"push guidance"}
 ```
 
-These lines correspond to `snapshot`, `show`, `create`, `open`, and `list`. Treat `reviewUrl` as a local secret: never print it, log it, commit it, or include it in an agent response. The Skill should open the browser instead.
+These lines correspond to `snapshot`, `show`, `create`, `open`, `list`, and `materialize`. Treat `reviewUrl` as a local secret: never print it, log it, commit it, or include it in an agent response. The Skill should open the browser instead.
 
 ## Manifest
 

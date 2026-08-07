@@ -41,7 +41,7 @@ The engine enforces these properties rather than relying on the agent to remembe
 3. **Exact block conservation.** Every source block must appear in exactly one virtual commit. Unknown, missing, and duplicate block IDs reject the whole manifest.
 4. **Exact final state.** `create` materializes cumulative states in an isolated temporary Git repository and verifies that the state after the last virtual commit equals the frozen target tree.
 5. **Equivalent complete review.** Real and Virtual use the same canonical binary/full-index diff options. The complete Virtual range therefore has the same patch and rendered Diff as the frozen complete Real range.
-6. **Read-only projection.** The workflow never applies a virtual commit to the worktree and never changes the real index, object database, refs, commits, Git configuration, or remotes.
+6. **Read-only projection.** The review workflow never applies a virtual commit to the worktree and never changes the real index, object database, refs, commits, Git configuration, or remotes. The only exception is the explicit `materialize` command described below: after every validation passes, it writes objects and moves exactly two branch refs — the backup branch it creates first and the reviewed branch it replaces. It still never touches the worktree, the real index, configuration, or remotes.
 
 Only the complete ranges are expected to match. A partial Real range and a partial Virtual range usually represent different groupings: Real follows Git's first-parent history, while Virtual follows the agent-authored reading order.
 
@@ -291,6 +291,33 @@ Important rules:
 
 Validation failures use stable error codes and field paths. For example, `MISSING_BLOCK`, `DUPLICATE_BLOCK`, `UNKNOWN_BLOCK`, and `UNKNOWN_TARGET` identify the exact assignment or anchor to fix. Retry with the same `SOURCE_ID`; taking a new snapshot would change the inventory being reviewed.
 
+## Materialize the plan as real commits
+
+Virtual commits normally stay local. When other reviewers should see the reading order on the Git hosting platform instead of installing local-mr, a revision can be converted into real commits:
+
+```bash
+local-mr virtual-commit materialize REVIEW_ID
+local-mr virtual-commit materialize REVIEW_ID --revision 2 --backup backup/login-flow/before-materialize
+```
+
+`materialize` rewrites the reviewed branch so it contains one real commit per virtual commit, in manifest order, starting at the frozen merge base. Each commit message carries the full review context: the virtual commit title as the subject, then the intent, the review-focus notes, the risk assessment, and a `Local-MR-Virtual-Commit: REVIEW_ID@rN i/n` trailer.
+
+The command refuses to run until every check passes, and it changes no reference before that point:
+
+1. **Fresh source only.** The branch must still point at the frozen head commit, the merge base with the frozen target ref must be unchanged, and the recomputed comparison must match the frozen `diffHash`. A stale revision fails with `STALE_SOURCE`; take a new snapshot and create a new revision instead.
+2. **Exact tree reproduction.** Every cumulative virtual state is rebuilt as a full tree in the repository, and the final tree must equal the frozen head commit's tree. On mismatch nothing is changed.
+3. **Backup before replacement.** The frozen head is saved to a backup branch first — `backup/<branch>/<short-sha>` by default, or the `--backup NAME` override. An existing backup branch pointing at a different commit fails with `BACKUP_EXISTS` rather than being overwritten.
+4. **Atomic compare-and-swap.** The branch ref is replaced only if it still points at the frozen head, so a concurrent commit cannot be silently discarded.
+
+The worktree, index, and uncommitted changes are never touched; because the final trees are identical, a checked-out branch stays clean after the replacement. The command never pushes. To restore the original history, run `git reset --hard <backup-branch>` (or point the branch back with `git branch -f`).
+
+Materializing trades Git history for review order:
+
+- The original commits, their authorship granularity, and their signatures survive only on the backup branch. New commits use the current Git identity and are unsigned.
+- Intermediate virtual states may not build; per-commit CI and `git bisect` reflect reading order, not build order.
+- Pushing a previously published branch afterwards requires `git push --force-with-lease`.
+- The saved review keeps working: the branch movement makes it **Virtual · stale**, which is expected — its frozen content now equals the pushed real commits.
+
 ## Storage, privacy, and cleanup
 
 Snapshots and reviews are stored outside the repository under:
@@ -317,4 +344,6 @@ Review servers listen only on `127.0.0.1` and put a random token in every applic
 | `INVALID_VIRTUAL_SOURCE_BOUNDARY` | The source does not start at the merge base or ends at the worktree. Select a complete merge-base-to-real-commit range. |
 | `INVALID_MANIFEST` | One or more schema, anchor, or block-conservation rules failed. Fix every entry in `error.details` and retry with the same source. |
 | `REVISION_CONFLICT` | The review gained another revision. Read the current revision, rebuild the intended update, and retry with the new `--expected-revision`. |
+| `STALE_SOURCE` | The branch, merge base, or comparison changed after the source was frozen, so `materialize` refused to replace the branch. Take a new snapshot and create a new revision. |
+| `BACKUP_EXISTS` | The backup branch already exists and points at a different commit. Pass a different `--backup NAME` or move the old backup away; nothing is overwritten. |
 | `SKILL_EXISTS` | The Codex Skill is already installed. Use `install-skill codex --force` only when intentionally updating it. |
