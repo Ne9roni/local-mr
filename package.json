@@ -42,8 +42,8 @@
   },
   "dependencies": {
     "diff2html": "3.4.56",
-    "dompurify": "3.4.12",
-    "marked": "18.0.6",
+    "dompurify": "3.4.15",
+    "marked": "18.0.12",
     "mermaid": "11.16.0"
   }
 }
